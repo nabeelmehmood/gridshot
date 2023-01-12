@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from 'react';
+import { GameContext, SCORE_CONSTATS } from '../Context';
 
-const getRandom = (list) => {
+const getRandom = list => {
   let randomNumber = Math.floor(Math.random() * 21);
   while (list.includes(randomNumber)) {
     randomNumber = Math.floor(Math.random() * 21);
@@ -8,7 +9,7 @@ const getRandom = (list) => {
   return randomNumber;
 };
 
-const SphereGrid = () => {
+const SphereGrid = ({setScore = () => {}}) => {
   const [sphereList, setSphereList] = useState([]);
 
   useEffect(() => {
@@ -19,18 +20,19 @@ const SphereGrid = () => {
     ({ position, id }) => {
       return (
         <mesh
-          onClick={(e) => {
+          onClick={e => {
             const id = e.object.sphereId;
             const newId = getRandom(sphereList);
-            const newList = [...sphereList].filter((item) => item !== id);
+            const newList = [...sphereList].filter(item => item !== id);
             newList.push(newId);
             setSphereList(newList);
+            setScore(score => score + 1);
           }}
           sphereId={id}
           position={position}
         >
           <sphereGeometry />
-          <meshPhysicalMaterial color={"red"} />
+          <meshPhysicalMaterial color={'red'} />
         </mesh>
       );
     },
