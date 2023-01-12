@@ -21,6 +21,14 @@ const GameContextProvider = ({ children }) => {
   const [gameStart, setGameStart] = useState(GAME_STATES.NOT_STARTED);
   const [score, setScore] = useState(0);
   const [totalClicks, setTotalClicks] = useState(0);
+  const [topScore, setTopScore] = useState(0);
+
+  useEffect(() => {
+    const topScoreLocal = localStorage.getItem("topScore");
+    if (topScoreLocal) {
+      setTopScore(topScoreLocal);
+    }
+  },[])
 
   useEffect(() => {
     //controls timer
@@ -53,7 +61,9 @@ const GameContextProvider = ({ children }) => {
         gameStart,
         setGameStart,
         totalClicks,
-        setTotalClicks
+        setTotalClicks,
+        topScore,
+        setTopScore
       }}
     >
       {children}
