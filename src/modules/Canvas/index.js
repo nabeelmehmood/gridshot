@@ -1,15 +1,15 @@
-import { PointerLockControls, Sky } from '@react-three/drei';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { DoubleSide, Vector3 } from 'three';
 import { useContext, useEffect, useRef } from 'react';
 // import Controls from "../Controls";
 import SphereGrid from '../SphereGrid';
 import { GameContext, GAME_STATES } from '../Context';
 import './index.css';
+import CameraControls from './PointerLockControls';
 
 const ThreeCanvas = () => {
   const controls = useRef();
-  const { gameStart, setGameStart, setTimeLeft, setScore, setTotalClicks } =
+  const { gameStart, setGameStart, setTimeLeft, setScore, setTotalClicks, sensitivity, fov } =
     useContext(GameContext);
 
   useEffect(() => {}, [controls]);
@@ -41,7 +41,9 @@ const ThreeCanvas = () => {
           document.body.style.cursor = 'initial';
           cursor.style.display = 'none';
           startOverlay.style.display = 'block';
-          controls.current && controls.current.camera && controls.current.camera.rotation.set(0, 0, 0);
+          controls.current &&
+            controls.current.camera &&
+            controls.current.camera.rotation.set(0, 0, 0);
           setGameStart(GAME_STATES.FINISHED);
         });
         controls.current.addEventListener('change', e => {
@@ -67,7 +69,8 @@ const ThreeCanvas = () => {
           side={DoubleSide}
         />
       </mesh>
-      <PointerLockControls selector="#startButton" ref={controls} />
+      {/* <PointerLockControls selector="#startButton" ref={controls} /> */}
+      <CameraControls fov={fov} sensitivity={sensitivity} ref={controls} />
     </Canvas>
   );
 };

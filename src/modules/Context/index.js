@@ -12,7 +12,12 @@ const GAME_STATES = {
 const SCORE_CONSTATS = {
   HIT: 10,
   CLICK_NEGATIVE: 5
-}
+};
+
+const DEFAULT_CAMERA = {
+  FOV: 75,
+  SENSITIVITY: 0
+};
 
 let timerInterval;
 
@@ -22,13 +27,29 @@ const GameContextProvider = ({ children }) => {
   const [score, setScore] = useState(0);
   const [totalClicks, setTotalClicks] = useState(0);
   const [topScore, setTopScore] = useState(0);
+  const [fov, setFov] = useState(DEFAULT_CAMERA.FOV);
+  const [sensitivity, setSensitivity] = useState(DEFAULT_CAMERA.SENSITIVITY);
 
   useEffect(() => {
-    const topScoreLocal = localStorage.getItem("topScore");
+    const topScoreLocal = localStorage.getItem('topScore');
+    const sensitivityLocal = localStorage.getItem('sensitivity');
+    const fovLocal = localStorage.getItem('fov');
+
     if (topScoreLocal) {
       setTopScore(topScoreLocal);
     }
-  },[])
+    if (fovLocal) {
+      setFov(fovLocal);
+    }
+    if (sensitivityLocal) {
+      setSensitivity(sensitivityLocal);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('sensitivity', sensitivity);
+    localStorage.setItem('fov', fov);
+  }, [sensitivity, fov]);
 
   useEffect(() => {
     //controls timer
@@ -63,7 +84,11 @@ const GameContextProvider = ({ children }) => {
         totalClicks,
         setTotalClicks,
         topScore,
-        setTopScore
+        setTopScore,
+        fov,
+        setFov,
+        sensitivity,
+        setSensitivity
       }}
     >
       {children}
@@ -71,4 +96,10 @@ const GameContextProvider = ({ children }) => {
   );
 };
 
-export { GameContext, GameContextProvider, GAME_STATES, SCORE_CONSTATS };
+export {
+  GameContext,
+  GameContextProvider,
+  GAME_STATES,
+  SCORE_CONSTATS,
+  DEFAULT_CAMERA
+};

@@ -9,12 +9,17 @@ const getRandom = list => {
   return randomNumber;
 };
 
-const SphereGrid = ({setScore = () => {}}) => {
+const SphereGrid = ({ setScore = () => {} }) => {
   const [sphereList, setSphereList] = useState([]);
 
   useEffect(() => {
-    setSphereList([getRandom([]), getRandom([]), getRandom([])]);
+    const tempList = [];
+    tempList.push(getRandom(tempList));
+    tempList.push(getRandom(tempList));
+    tempList.push(getRandom(tempList));
+    setSphereList(tempList);
   }, []);
+  console.log(sphereList);
 
   const Sphere = useCallback(
     ({ position, id }) => {
@@ -31,7 +36,7 @@ const SphereGrid = ({setScore = () => {}}) => {
           sphereId={id}
           position={position}
         >
-          <sphereGeometry />
+          <sphereGeometry args={[1, 32, 32]}/>
           <meshPhysicalMaterial color={'red'} />
         </mesh>
       );

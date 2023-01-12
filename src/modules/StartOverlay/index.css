@@ -56,3 +56,15 @@
   padding: 10px 30px;
   cursor: pointer;
 }
+
+.slidersWrapper {
+  position: absolute;
+  left: 5%;
+  bottom: 10%;
+}
+
+.slider {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 10px;
+}
