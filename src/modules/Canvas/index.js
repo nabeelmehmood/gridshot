@@ -1,13 +1,13 @@
 import { Canvas, useFrame } from '@react-three/fiber';
 import { DoubleSide, Vector3 } from 'three';
-import { useContext, useEffect, useRef } from 'react';
+import { memo, useContext, useEffect, useRef } from 'react';
 // import Controls from "../Controls";
 import SphereGrid from '../SphereGrid';
 import { GameContext, GAME_STATES } from '../Context';
 import './index.css';
 import CameraControls from './PointerLockControls';
 
-const ThreeCanvas = () => {
+const ThreeCanvas = memo(() => {
   const controls = useRef();
   const { gameStart, setGameStart, setTimeLeft, setScore, setTotalClicks, sensitivity, fov } =
     useContext(GameContext);
@@ -69,10 +69,9 @@ const ThreeCanvas = () => {
           side={DoubleSide}
         />
       </mesh>
-      {/* <PointerLockControls selector="#startButton" ref={controls} /> */}
       <CameraControls fov={fov} sensitivity={sensitivity} ref={controls} />
     </Canvas>
   );
-};
+});
 
 export default ThreeCanvas;

@@ -1,23 +1,14 @@
-import { useCallback, useContext, useEffect, useState } from 'react';
-import { GameContext, SCORE_CONSTATS } from '../Context';
+import { useCallback, useEffect, useState } from 'react';
+import { remove, sample, sampleSize } from 'lodash';
 
-const getRandom = list => {
-  let randomNumber = Math.floor(Math.random() * 21);
-  while (list.includes(randomNumber)) {
-    randomNumber = Math.floor(Math.random() * 21);
-  }
-  return randomNumber;
-};
+const array = [...Array(21).keys()];
 
 const SphereGrid = ({ setScore = () => {} }) => {
   const [sphereList, setSphereList] = useState([]);
 
   useEffect(() => {
-    const tempList = [];
-    tempList.push(getRandom(tempList));
-    tempList.push(getRandom(tempList));
-    tempList.push(getRandom(tempList));
-    setSphereList(tempList);
+    const list = sampleSize(array, 3);
+    setSphereList(list);
   }, []);
 
   const Sphere = useCallback(
@@ -26,10 +17,14 @@ const SphereGrid = ({ setScore = () => {} }) => {
         <mesh
           onClick={e => {
             const id = e.object.sphereId;
-            const newId = getRandom(sphereList);
-            const newList = [...sphereList].filter(item => item !== id);
-            newList.push(newId);
-            setSphereList(newList);
+            const list = [...sphereList].filter(item => item !== id);
+            const sampleList = remove(
+              [...array],
+              number => !sphereList.includes(number)
+            );
+
+            const newId = sample(sampleList);
+            setSphereList([...list, newId]);
             setScore(score => score + 1);
           }}
           sphereId={id}
