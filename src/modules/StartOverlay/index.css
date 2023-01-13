@@ -50,7 +50,7 @@
 .retryButton {
   position: absolute;
   left: 50%;
-  top: 75%;
+  bottom: 5%;
   transform: translate(-50%, -50%);
   background-color: yellow;
   padding: 10px 30px;

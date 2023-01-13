@@ -19,7 +19,6 @@ const SphereGrid = ({ setScore = () => {} }) => {
     tempList.push(getRandom(tempList));
     setSphereList(tempList);
   }, []);
-  console.log(sphereList);
 
   const Sphere = useCallback(
     ({ position, id }) => {
@@ -36,7 +35,7 @@ const SphereGrid = ({ setScore = () => {} }) => {
           sphereId={id}
           position={position}
         >
-          <sphereGeometry args={[1, 32, 32]}/>
+          <sphereGeometry args={[1, 32, 32]} />
           <meshPhysicalMaterial color={'red'} />
         </mesh>
       );

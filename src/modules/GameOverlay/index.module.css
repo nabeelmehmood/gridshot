@@ -35,3 +35,106 @@
   font-size: 32px;
   flex-direction: column;
 }
+
+.saveScoreForm {
+  position: absolute;
+  bottom: 20%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  pointer-events: all;
+  flex-direction: column;
+}
+
+.formDesc {
+  margin-bottom: 8px;
+}
+
+.formInput {
+  margin-bottom: 8px;
+}
+
+.error {
+  margin-bottom: 8px;
+  color: red;
+}
+
+.lds_dual_ring {
+  display: inline-block;
+  width: 30px;
+  height: 30px;
+}
+
+.lds_dual_ring:after {
+  content: ' ';
+  display: block;
+  width: 20px;
+  height: 20px;
+  margin: 8px;
+  border-radius: 50%;
+  border: 6px solid #fff;
+  border-color: #fff transparent #fff transparent;
+  animation: lds-dual-ring 1.2s linear infinite;
+}
+
+@keyframes lds-dual-ring {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.topScorer {
+  position: absolute;
+  background-color: rgba(0, 0, 0, 0.5);
+  padding: 10px;
+  right: 0;
+  font-size: 24px;
+  color: white;
+  top: 50%;
+}
+
+.leaderboardButton {
+  cursor: pointer;
+  pointer-events: all;
+  text-decoration: underline;
+  font-size: 18px;
+  margin-top: 8px;
+}
+
+.leaderboardModal {
+  position: fixed;
+  top: 10%;
+  pointer-events: all;
+  left: 50%;
+  transform: translateX(-50%);
+  max-height: 80%;
+  min-height: 10%;
+  max-width: 80%;
+  min-width: 500px;
+  overflow: scroll;
+  z-index: 2;
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+}
+
+.closeButton {
+  position: absolute;
+  top: 5%;
+  right: 2%;
+  color: white;
+  cursor: pointer;
+}
+
+.leadersList {
+  margin-top: 40px;
+  margin-bottom: 20px;
+}
+
+.leadersItem {
+  display: flex;
+  padding: 5px 20px;
+  justify-content: space-between;
+}

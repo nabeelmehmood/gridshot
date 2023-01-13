@@ -1,4 +1,6 @@
+import axios from 'axios';
 import { createContext, useEffect, useState } from 'react';
+import { getTopScores } from '../../api';
 
 const GameContext = createContext();
 
@@ -29,27 +31,45 @@ const GameContextProvider = ({ children }) => {
   const [topScore, setTopScore] = useState(0);
   const [fov, setFov] = useState(DEFAULT_CAMERA.FOV);
   const [sensitivity, setSensitivity] = useState(DEFAULT_CAMERA.SENSITIVITY);
+  const [scoreSaved, setScoreSaved] = useState(false);
+  const [leaderboard, setLeaderboard] = useState();
+
+  const getScores = () => {
+    axios.get(getTopScores).then(res => {
+      if (res.data && res.data.users) {
+        setLeaderboard(res.data.users);
+      }
+    });
+  };
 
   useEffect(() => {
     const topScoreLocal = localStorage.getItem('topScore');
     const sensitivityLocal = localStorage.getItem('sensitivity');
     const fovLocal = localStorage.getItem('fov');
-
+    const scoreSavedLocal = localStorage.getItem('scoreSaved');
     if (topScoreLocal) {
-      setTopScore(topScoreLocal);
+      setTopScore(JSON.parse(topScoreLocal));
     }
     if (fovLocal) {
-      setFov(fovLocal);
+      setFov(JSON.parse(fovLocal));
     }
     if (sensitivityLocal) {
-      setSensitivity(sensitivityLocal);
+      setSensitivity(JSON.parse(sensitivityLocal));
     }
+    if (scoreSavedLocal) {
+      setScoreSaved(JSON.parse(scoreSavedLocal));
+    }
+    getScores();
   }, []);
 
   useEffect(() => {
     localStorage.setItem('sensitivity', sensitivity);
     localStorage.setItem('fov', fov);
   }, [sensitivity, fov]);
+
+  useEffect(() => {
+    localStorage.setItem('scoreSaved', scoreSaved);
+  }, [scoreSaved]);
 
   useEffect(() => {
     //controls timer
@@ -88,7 +108,11 @@ const GameContextProvider = ({ children }) => {
         fov,
         setFov,
         sensitivity,
-        setSensitivity
+        setSensitivity,
+        scoreSaved,
+        setScoreSaved,
+        leaderboard,
+        getScores
       }}
     >
       {children}
