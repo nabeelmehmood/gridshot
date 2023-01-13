@@ -2,9 +2,11 @@ import axios from 'axios';
 import React, { useContext, useEffect, useState } from 'react';
 import { addScore } from '../../api';
 import { GameContext, GAME_STATES, SCORE_CONSTATS } from '../Context';
+import Filter from 'bad-words';
 import styles from './index.module.css';
 
 const usernameRegex = /^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$/;
+const filter = new Filter();
 
 const GameOverlay = () => {
   const {
@@ -94,7 +96,7 @@ const GameOverlay = () => {
         <div className={styles.topScorer}>
           <div>Top Scorer</div>
           <div>
-            {topScorer.username} : {topScorer.score}
+            {filter.clean(topScorer.username)} : {topScorer.score}
           </div>
           <div
             className={styles.leaderboardButton}
@@ -158,7 +160,7 @@ const GameOverlay = () => {
               leaderboard.map((item, index) => {
                 return (
                   <div className={styles.leadersItem}>
-                    <span>{index + 1}. {item.username}</span> 
+                    <span>{index + 1}. {filter.clean(item.username)}</span> 
                     <span>{item.score}</span>
                   </div>
                 );
