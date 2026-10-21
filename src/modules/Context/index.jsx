@@ -14,6 +14,7 @@ export const DEFAULT_SETTINGS = {
   theme: DEFAULT_THEME,
   effects: true,
   rawInput: false,
+  customCursor: true,
   crosshair: { style: 'cross', color: '#ffffff', size: 22, thickness: 2, gap: 4, outline: true }
 };
 
@@ -73,6 +74,7 @@ const loadSettings = () => ({
   theme: readStored('theme', value => Boolean(THEMES[value]), DEFAULT_SETTINGS.theme),
   effects: readStored('effects', value => typeof value === 'boolean', DEFAULT_SETTINGS.effects),
   rawInput: readStored('rawInput', value => typeof value === 'boolean', DEFAULT_SETTINGS.rawInput),
+  customCursor: readStored('customCursor', value => typeof value === 'boolean', DEFAULT_SETTINGS.customCursor),
   crosshair: readStored('crosshair', isCrosshair, DEFAULT_SETTINGS.crosshair)
 });
 
@@ -120,6 +122,7 @@ export function GameContextProvider({ children }) {
     writeStored('theme', settings.theme);
     writeStored('effects', settings.effects);
     writeStored('crosshair', settings.crosshair);
+    writeStored('customCursor', settings.customCursor);
   }, [settings]);
 
   useEffect(() => {

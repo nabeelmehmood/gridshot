@@ -3,6 +3,7 @@ import { calculateScore, formatAccuracy, POINTS } from '../../game/scoring';
 import { MODE_IDS, MODES } from '../../game/modes';
 import { bestRunOf, PHASES } from '../../game/state';
 import { cleanName } from '../../game/username';
+import { hasFinePointer } from '../../device';
 import { readStored, writeStored } from '../../storage';
 import { THEME_IDS, THEMES } from '../../themes';
 import { DEFAULT_SETTINGS, SETTING_LIMITS, useGame } from '../Context';
@@ -13,7 +14,7 @@ import styles from './index.module.css';
 
 // Phones and tablets without a mouse get a showcase: browse modes, themes and the leaderboard, but
 // no Start (the game is built on mouse capture) and no mouse settings.
-const hasPointer = typeof window !== 'undefined' && window.matchMedia('(any-pointer: fine)').matches;
+const hasPointer = hasFinePointer;
 const SHARE_URL = 'https://nabeelmehmood.github.io/gridshot/';
 
 // First visit walks through mode → theme → start; after that the picks are collapsible cards.
@@ -431,6 +432,10 @@ function Settings() {
       <label className={styles.toggle}>
         <input type="checkbox" checked={settings.effects} onChange={toggle('effects')} />
         Particles and effects
+      </label>
+      <label className={styles.toggle}>
+        <input type="checkbox" checked={settings.customCursor} onChange={toggle('customCursor')} />
+        Animated cursor
       </label>
       <button
         type="button"

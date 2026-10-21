@@ -52,6 +52,27 @@ button:disabled {
   opacity: 0.6;
 }
 
+/* While the animated cursor is on (modules/Cursor), it replaces the native one everywhere except
+   text fields and the leaderboard dialog, which sits in the browser's top layer above it. */
+.custom-cursor,
+.custom-cursor * {
+  cursor: none !important;
+}
+
+.custom-cursor input[type='text'],
+.custom-cursor textarea {
+  cursor: text !important;
+}
+
+.custom-cursor dialog,
+.custom-cursor dialog * {
+  cursor: auto !important;
+}
+
+.custom-cursor dialog button {
+  cursor: pointer !important;
+}
+
 .vignette {
   position: fixed;
   inset: 0;
