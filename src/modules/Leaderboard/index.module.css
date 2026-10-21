@@ -45,7 +45,8 @@
 }
 
 .tabs {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
   margin-bottom: 12px;
   padding: 4px;
@@ -54,13 +55,20 @@
 }
 
 .tab {
-  flex: 1;
-  padding: 6px 8px;
+  min-width: 0;
+  padding: 7px 4px;
   border: 0;
   border-radius: 7px;
   background: none;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab:hover {
+  color: var(--text);
 }
 
 .tab[aria-selected='true'] {
