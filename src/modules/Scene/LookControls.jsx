@@ -24,8 +24,12 @@ const _targetQuaternion = new Quaternion();
 
 const easeInOut = t => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
-function menuPose(time, position, quaternion) {
-  position.copy(MENU_POSITION);
+// Narrow (portrait) screens see far less width, so the menu camera backs off to keep the board in view.
+const MENU_FIT_ASPECT = 1.3;
+
+function menuPose(time, aspect, position, quaternion) {
+  const pullBack = Math.max(1, MENU_FIT_ASPECT / aspect);
+  position.copy(MENU_POSITION).sub(MENU_TARGET).multiplyScalar(pullBack).add(MENU_TARGET);
   position.x += Math.sin(time * 0.15) * 1.2;
   position.y += Math.sin(time * 0.23) * 0.3;
   quaternion.setFromRotationMatrix(_matrix.lookAt(position, MENU_TARGET, _up));
@@ -109,7 +113,7 @@ export default function LookControls({ controlsRef, sensitivity, fov, onEnterSta
     if (current.mode === 'game') return;
 
     if (current.mode === 'menu') {
-      menuPose(clock.elapsedTime, camera.position, camera.quaternion);
+      menuPose(clock.elapsedTime, camera.aspect, camera.position, camera.quaternion);
       return;
     }
 
@@ -119,7 +123,7 @@ export default function LookControls({ controlsRef, sensitivity, fov, onEnterSta
       _targetPosition.copy(GAME_POSITION);
       _targetQuaternion.copy(GAME_QUATERNION);
     } else {
-      menuPose(clock.elapsedTime, _targetPosition, _targetQuaternion);
+      menuPose(clock.elapsedTime, camera.aspect, _targetPosition, _targetQuaternion);
     }
     const eased = easeInOut(current.t);
     camera.position.lerpVectors(current.fromPosition, _targetPosition, eased);

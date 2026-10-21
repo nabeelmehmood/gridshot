@@ -10,7 +10,10 @@ import Leaderboard from '../Leaderboard';
 import SaveScore from '../Leaderboard/SaveScore';
 import styles from './index.module.css';
 
+// Phones and tablets without a mouse get a showcase: browse modes, themes and the leaderboard, but
+// no Start (the game is built on mouse capture) and no mouse settings.
 const hasPointer = typeof window !== 'undefined' && window.matchMedia('(any-pointer: fine)').matches;
+const SHARE_URL = 'https://nabeelmehmood.github.io/gridshot/';
 
 // First visit walks through mode → theme → start; after that the picks are collapsible cards.
 const STEPS = ['mode', 'theme', 'start'];
@@ -21,8 +24,11 @@ const isBoolean = value => typeof value === 'boolean';
 export default function Menu() {
   const { game, settings } = useGame();
   const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [step, setStep] = useState(() => (readStored('onboarded', isBoolean, false) ? null : STEPS[0]));
+  const [step, setStep] = useState(() =>
+    !hasPointer || readStored('onboarded', isBoolean, false) ? null : STEPS[0]
+  );
   const [open, setOpen] = useState({ mode: false, theme: false });
+  const [peek, setPeek] = useState(false);
 
   const finishOnboarding = () => {
     writeStored('onboarded', true);
@@ -32,6 +38,15 @@ export default function Menu() {
   const toggle = key => () => setOpen(current => ({ ...current, [key]: !current[key] }));
   const guide = step && { step, total: STEPS.length, onNext: nextStep, onSkip: finishOnboarding };
   const theme = THEMES[settings.theme];
+
+  // Theme preview on phones: the menu steps aside to show the scene until the next tap.
+  if (peek) {
+    return (
+      <button type="button" className={styles.peekReturn} onClick={() => setPeek(false)}>
+        <span>{theme.name} · tap to return</span>
+      </button>
+    );
+  }
 
   return (
     <div className={styles.overlay}>
@@ -68,15 +83,17 @@ export default function Menu() {
             dimmed={Boolean(step) && step !== 'theme'}
           >
             {step === 'theme' && <StepBanner {...guide} label="Pick a theme. It previews behind this menu." next="Next: start" />}
-            <ThemePicker />
+            <ThemePicker onPreview={hasPointer ? undefined : () => setPeek(true)} />
           </Collapsible>
         </div>
-        <aside className={`${styles.card} ${styles.settingsCard}`} aria-labelledby="settings-title">
-          <h2 id="settings-title" className={styles.cardTitle}>
-            Settings
-          </h2>
-          <Settings />
-        </aside>
+        {hasPointer && (
+          <aside className={`${styles.card} ${styles.settingsCard}`} aria-labelledby="settings-title">
+            <h2 id="settings-title" className={styles.cardTitle}>
+              Settings
+            </h2>
+            <Settings />
+          </aside>
+        )}
       </div>
 
       {showLeaderboard && <Leaderboard onClose={() => setShowLeaderboard(false)} />}
@@ -177,7 +194,7 @@ function MainCard({ onOpenLeaderboard, guide, dimmed, onStarted }) {
       {canSave && <SaveScore />}
       {finished && game.newBest && bestRun?.saved && <p className={styles.success}>Saved to the leaderboard.</p>}
 
-      {!hasPointer && <p className={styles.warning}>Gridshot needs a mouse. Open it in a desktop browser to play.</p>}
+      {!hasPointer && <PlayOnComputer />}
       {lockError && (
         <p role="alert" className={styles.warning}>
           {lockError}
@@ -185,20 +202,18 @@ function MainCard({ onOpenLeaderboard, guide, dimmed, onStarted }) {
       )}
 
       {startStep && <StepBanner {...guide} label="You're set. Press Start when ready." />}
-      <button
-        type="button"
-        className={`${styles.startButton} ${startStep ? styles.pulse : ''}`}
-        onClick={start}
-        disabled={!hasPointer}
-        autoFocus
-      >
-        {finished ? 'Play again' : 'Start'}
-      </button>
-      <p className={styles.rules}>
-        Hit +{POINTS.HIT} · Miss {POINTS.MISS}
-        {mode.expiredLabel && ` · ${mode.expiredLabel} ${POINTS.EXPIRED}`}
-        {mode.untimed && ` · ${mode.lives} lives`} · Esc ends the run
-      </p>
+      {hasPointer && (
+        <>
+          <button type="button" className={`${styles.startButton} ${startStep ? styles.pulse : ''}`} onClick={start} autoFocus>
+            {finished ? 'Play again' : 'Start'}
+          </button>
+          <p className={styles.rules}>
+            Hit +{POINTS.HIT} · Miss {POINTS.MISS}
+            {mode.expiredLabel && ` · ${mode.expiredLabel} ${POINTS.EXPIRED}`}
+            {mode.untimed && ` · ${mode.lives} lives`} · Esc ends the run
+          </p>
+        </>
+      )}
 
       <footer className={styles.footer}>
         <span className={styles.topScorer}>
@@ -222,6 +237,46 @@ function MainCard({ onOpenLeaderboard, guide, dimmed, onStarted }) {
   );
 }
 
+function PlayOnComputer() {
+  const [copied, setCopied] = useState(false);
+  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(SHARE_URL);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  };
+  // Dismissing the share sheet rejects; nothing to report.
+  const share = () =>
+    navigator
+      .share({ title: 'Gridshot – Free Aim Trainer', text: 'Free aim trainer to play on my computer', url: SHARE_URL })
+      .catch(() => {});
+
+  return (
+    <section className={styles.playOnComputer} aria-labelledby="play-on-computer">
+      <h2 id="play-on-computer" className={styles.playOnComputerTitle}>
+        Play on a computer
+      </h2>
+      <p className={styles.playOnComputerText}>
+        Gridshot trains your mouse aim, so it needs a mouse and keyboard. Send yourself the link and play on your
+        computer.
+      </p>
+      {canShare && (
+        <button type="button" className={styles.startButton} onClick={share}>
+          Share link
+        </button>
+      )}
+      <button type="button" className={canShare ? styles.secondaryButton : styles.startButton} onClick={copy}>
+        {copied ? 'Link copied' : 'Copy link'}
+      </button>
+      <p className={styles.playOnComputerHint}>Meanwhile, browse the modes, themes and leaderboard below.</p>
+    </section>
+  );
+}
+
 function ModePicker() {
   const { game, selectMode } = useGame();
   return (
@@ -238,7 +293,7 @@ function ModePicker() {
   );
 }
 
-function ThemePicker() {
+function ThemePicker({ onPreview }) {
   const { settings, setSettings } = useGame();
   return (
     <fieldset className={styles.themes}>
@@ -259,6 +314,11 @@ function ThemePicker() {
         ))}
       </div>
       <p className={styles.themeDescription}>{THEMES[settings.theme].description}</p>
+      {onPreview && (
+        <button type="button" className={styles.secondaryButton} onClick={onPreview}>
+          Preview full screen
+        </button>
+      )}
     </fieldset>
   );
 }
