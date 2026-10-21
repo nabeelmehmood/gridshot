@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import {
   calculateScore,
   formatAccuracy,
@@ -10,6 +10,7 @@ import {
 import { MODE_IDS, MODES } from '../../game/modes';
 import { bestRunOf, PHASES } from '../../game/state';
 import { cleanName } from '../../game/username';
+import { track } from '../../analytics';
 import { hasFinePointer } from '../../device';
 import { readStored, writeStored } from '../../storage';
 import { THEME_IDS, THEMES } from '../../themes';
@@ -45,7 +46,11 @@ export default function Menu() {
   };
   const nextStep = () => setStep(current => STEPS[STEPS.indexOf(current) + 1]);
   const toggle = key => () => setOpen(current => ({ ...current, [key]: !current[key] }));
-  const guide = step && { step, total: STEPS.length, onNext: nextStep, onSkip: finishOnboarding };
+  const skipOnboarding = () => {
+    track('onboarding_skip', { step });
+    finishOnboarding();
+  };
+  const guide = step && { step, total: STEPS.length, onNext: nextStep, onSkip: skipOnboarding };
   const theme = THEMES[settings.theme];
 
   // Theme preview on phones: the menu steps aside to show the scene until the next tap.
@@ -188,6 +193,7 @@ function MainCard({ onOpenLeaderboard, guide, dimmed, onStarted }) {
   const startStep = guide?.step === 'start';
 
   const openLeaderboard = () => {
+    track('leaderboard_open', { mode: game.mode });
     onOpenLeaderboard();
     loadLeaderboard(game.mode);
   };
@@ -309,8 +315,16 @@ function ScoringRules({ mode }) {
   );
 }
 
+// Once per page load; the banner remounts after a theme peek.
+let previewTracked = false;
+
 function PreviewBanner() {
-  const [copied, copy] = useCopyLink();
+  const [copied, copy] = useCopyLink('phone');
+  useEffect(() => {
+    if (previewTracked) return;
+    previewTracked = true;
+    track('phone_preview');
+  }, []);
   return (
     <div className={styles.previewBanner} role="note">
       <span className={styles.previewTag}>Preview</span>
@@ -334,9 +348,9 @@ function MouseIcon() {
 }
 
 function PlayOnComputer() {
-  const [copied, copy] = useCopyLink();
+  const [copied, copy] = useCopyLink('phone');
   const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
-  const share = () => nativeShare('Free aim trainer to play on my computer');
+  const share = () => nativeShare('Free aim trainer to play on my computer', 'phone');
 
   return (
     <section className={styles.playOnComputer} aria-labelledby="play-on-computer">
@@ -390,7 +404,10 @@ function ThemePicker({ onPreview }) {
               name="theme"
               value={id}
               checked={settings.theme === id}
-              onChange={() => setSettings(current => ({ ...current, theme: id }))}
+              onChange={() => {
+                track('theme_select', { theme: id });
+                setSettings(current => ({ ...current, theme: id }));
+              }}
             />
             <ThemeBadge colors={THEMES[id].swatch} />
             {THEMES[id].name}
@@ -449,7 +466,7 @@ function Results({ game }) {
       {completed && score > 0 && (
         <div className={styles.shareScore}>
           <span className={styles.shareScoreLabel}>Share your score</span>
-          <ShareButtons text={scoreShareText(score, name)} />
+          <ShareButtons text={scoreShareText(score, name)} where="results" />
         </div>
       )}
     </section>

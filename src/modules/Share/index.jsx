@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { track } from '../../analytics';
 import { MODES } from '../../game/modes';
 import { THEMES } from '../../themes';
+import { ConsentToggle } from '../Consent';
 import { useGame } from '../Context';
 import styles from './index.module.css';
 
@@ -53,9 +55,11 @@ function shareLinks(text) {
   ];
 }
 
-export function useCopyLink() {
+// `where` is the part of the page a copy or share came from: menu, results or phone.
+export function useCopyLink(where) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
+    track('copy_link', { where });
     try {
       await navigator.clipboard.writeText(SITE_URL);
       setCopied(true);
@@ -68,22 +72,30 @@ export function useCopyLink() {
 }
 
 // Dismissing the share sheet rejects; nothing to report.
-export function nativeShare(text) {
+export function nativeShare(text, where) {
+  track('share', { where, network: 'native' });
   return navigator.share({ title: 'Gridshot – Free Aim Trainer', text, url: SITE_URL }).catch(() => {});
 }
 
 // Row of share targets. `text` is the message posted with the link (a score, or the default pitch).
-export function ShareButtons({ text = DEFAULT_TEXT }) {
-  const [copied, copy] = useCopyLink();
+export function ShareButtons({ text = DEFAULT_TEXT, where = 'menu' }) {
+  const [copied, copy] = useCopyLink(where);
   return (
     <div className={styles.shareRow}>
       {canNativeShare() && (
-        <button type="button" className={styles.pill} onClick={() => nativeShare(text)}>
+        <button type="button" className={styles.pill} onClick={() => nativeShare(text, where)}>
           Share…
         </button>
       )}
       {shareLinks(text).map(({ label, href }) => (
-        <a key={label} className={styles.pill} href={href} target="_blank" rel="noopener noreferrer">
+        <a
+          key={label}
+          className={styles.pill}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => track('share', { where, network: label.toLowerCase() })}
+        >
           {label}
         </a>
       ))}
@@ -122,13 +134,21 @@ export function ShareAndFeedback() {
             href={feedbackUrl(gameInfo)}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => track('feedback_open', { topic: 'feedback' })}
           >
             Send feedback
           </a>
-          <a className={styles.pill} href={feedbackUrl(gameInfo, BUG_TOPIC)} target="_blank" rel="noopener noreferrer">
+          <a
+            className={styles.pill}
+            href={feedbackUrl(gameInfo, BUG_TOPIC)}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => track('feedback_open', { topic: 'bug' })}
+          >
             Report a bug
           </a>
         </div>
+        <ConsentToggle />
       </section>
     </div>
   );

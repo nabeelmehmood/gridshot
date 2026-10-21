@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { track } from '../../analytics';
 import { submitScore } from '../../api';
 import { MODES } from '../../game/modes';
 import { bestRunOf } from '../../game/state';
@@ -32,6 +33,7 @@ export default function SaveScore() {
     setError('');
     try {
       await submitScore(name, bestRun);
+      track('score_saved', { mode: game.mode, score: bestRun.score });
       writeStored('username', name);
       markScoreSaved(game.mode);
       recordSavedScore(game.mode, { username: name, score: bestRun.score });

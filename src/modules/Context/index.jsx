@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useReducer, useRef, useState } from 'react';
+import { track } from '../../analytics';
 import { fetchTopScores, registerRun } from '../../api';
 import { DEFAULT_MODE, MODES, newRolls } from '../../game/modes';
+import { calculateAccuracy, calculateScore } from '../../game/scoring';
 import { createInitialState, gameReducer, PHASES } from '../../game/state';
 import { resetStreak, unlockAudio } from '../../sound';
 import { readStored, writeStored } from '../../storage';
@@ -106,6 +108,23 @@ export function GameContextProvider({ children }) {
 
   const { phase, mode, bestRuns } = game;
 
+  // One event per run as it ends: finished runs report the result, Esc reports how long it lasted.
+  const { completed, hits, clicks, expired, bonus, bestStreak, newBest, elapsed } = game;
+  useEffect(() => {
+    if (phase !== PHASES.FINISHED) return;
+    if (completed) {
+      track('run_complete', {
+        mode,
+        score: calculateScore(hits, clicks, expired, bonus),
+        accuracy: Math.round((calculateAccuracy(hits, clicks) ?? 0) * 10) / 10,
+        best_streak: bestStreak,
+        new_best: newBest
+      });
+    } else {
+      track('run_abandon', { mode, seconds_played: elapsed });
+    }
+  }, [phase, completed, mode, hits, clicks, expired, bonus, bestStreak, newBest, elapsed]);
+
   useEffect(() => {
     writeStored('mode', mode);
   }, [mode]);
@@ -197,12 +216,13 @@ export function GameContextProvider({ children }) {
     runCounter.current += 1;
     const runKey = runCounter.current;
     dispatch({ type: 'start', runKey, rolls: newRolls() });
+    track('run_start', { mode: game.mode, theme: settings.theme, crosshair: settings.crosshair.style });
     // Offline or server errors just leave the run unsubmittable; the game itself is unaffected.
     registerRun(game.mode).then(
       runId => dispatch({ type: 'runRegistered', runKey, runId }),
       () => {}
     );
-  }, [game.mode]);
+  }, [game.mode, settings.theme, settings.crosshair.style]);
 
   const endRun = useCallback(() => dispatch({ type: 'finish' }), []);
 
@@ -220,7 +240,10 @@ export function GameContextProvider({ children }) {
   }, [endRun]);
   const shoot = useCallback(targetKey => dispatch({ type: 'shot', targetKey, rolls: newRolls() }), []);
   const expire = useCallback(targetKey => dispatch({ type: 'expire', targetKey, rolls: newRolls() }), []);
-  const selectMode = useCallback(nextMode => dispatch({ type: 'selectMode', mode: nextMode, rolls: newRolls() }), []);
+  const selectMode = useCallback(nextMode => {
+    track('mode_select', { mode: nextMode });
+    dispatch({ type: 'selectMode', mode: nextMode, rolls: newRolls() });
+  }, []);
   const markScoreSaved = useCallback(savedMode => dispatch({ type: 'scoreSaved', mode: savedMode }), []);
   const reportLockError = useCallback(() => setLockError(LOCK_ERROR), []);
 
