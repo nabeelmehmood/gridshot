@@ -81,6 +81,35 @@
       }
     </script>
 
+    <!-- Boot loader styles are inline so it paints before any JavaScript or font arrives. -->
+    <style>
+      html, body { margin: 0; height: 100%; background: #0d1017; }
+      #boot {
+        position: fixed; inset: 0; z-index: 100;
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px;
+        background: radial-gradient(ellipse at center, #1a1f2b, #0d1017 70%);
+        color: #e8ecf3; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        transition: opacity 0.5s ease, visibility 0.5s ease;
+      }
+      #boot.boot-hidden { opacity: 0; visibility: hidden; }
+      #boot svg { width: 96px; height: 96px; }
+      #boot .boot-target { transform-origin: 32px 32px; animation: boot-pulse 1.2s ease-in-out infinite; }
+      #boot .boot-crosshair { transform-origin: 32px 32px; animation: boot-spin 3s linear infinite; }
+      #boot .boot-title { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: 0.3em; text-indent: 0.3em; }
+      #boot .boot-bar { position: relative; width: 180px; height: 4px; overflow: hidden; border-radius: 2px; background: rgba(255, 255, 255, 0.1); }
+      #boot .boot-bar::after {
+        content: ''; position: absolute; top: 0; left: 0; width: 40%; height: 100%; border-radius: 2px;
+        background: #ffcf33; animation: boot-slide 1.1s ease-in-out infinite;
+      }
+      #boot .boot-hint { margin: 0; font-size: 13px; color: #8b94a7; }
+      @keyframes boot-pulse { 50% { transform: scale(0.86); } }
+      @keyframes boot-spin { to { transform: rotate(360deg); } }
+      @keyframes boot-slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+      @media (prefers-reduced-motion: reduce) {
+        #boot .boot-target, #boot .boot-crosshair, #boot .boot-bar::after { animation: none; }
+      }
+    </style>
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&display=swap" rel="stylesheet" />
@@ -95,6 +124,26 @@
         leaderboards. You need to enable JavaScript to play.
       </p>
     </noscript>
+    <!-- Removed by src/bootLoader.js once the 3D scene has drawn its first frames. -->
+    <div id="boot" role="status" aria-label="Loading Gridshot">
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <rect width="64" height="64" rx="14" fill="#161b26" />
+        <g class="boot-target">
+          <circle cx="32" cy="32" r="19" fill="#ff4655" stroke="#2a0a0e" stroke-width="2" />
+          <circle cx="27" cy="26" r="5" fill="#ffffff" opacity="0.28" />
+        </g>
+        <g class="boot-crosshair" stroke="#ffffff" stroke-width="4" stroke-linecap="round">
+          <line x1="32" y1="6" x2="32" y2="22" />
+          <line x1="32" y1="42" x2="32" y2="58" />
+          <line x1="6" y1="32" x2="22" y2="32" />
+          <line x1="42" y1="32" x2="58" y2="32" />
+          <circle cx="32" cy="32" r="3" fill="#ffffff" stroke="none" />
+        </g>
+      </svg>
+      <p class="boot-title">GRIDSHOT</p>
+      <div class="boot-bar"></div>
+      <p class="boot-hint">Loading the range…</p>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

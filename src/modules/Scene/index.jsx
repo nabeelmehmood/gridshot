@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { Canvas, useThree } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Raycaster, Vector2, Vector3 } from 'three';
 import { MODES } from '../../game/modes';
 import { PHASES } from '../../game/state';
+import { hideBootLoader } from '../../bootLoader';
 import { playShot } from '../../sound';
 import { THEMES } from '../../themes';
 import { useGame } from '../Context';
@@ -67,6 +68,18 @@ function Shooter({ targetsRef, environmentRef, effectsRef, onShot, volume, theme
   return null;
 }
 
+// Hides the boot loader once a few frames have actually rendered (textures uploaded, shaders compiled),
+// so the first thing players see is the finished scene rather than a half-built one.
+const READY_AFTER_FRAMES = 3;
+function ReadySignal() {
+  const frames = useRef(0);
+  useFrame(() => {
+    frames.current += 1;
+    if (frames.current === READY_AFTER_FRAMES) hideBootLoader();
+  });
+  return null;
+}
+
 export default function Scene() {
   const { game, settings, controlsRef, beginEntering, enterGame, leaveGame, shoot, expire, reportLockError } = useGame();
   const targetsRef = useRef(null);
@@ -95,6 +108,7 @@ export default function Scene() {
       />
       {settings.effects && theme.ambient && <Ambient key={theme.ambient} preset={theme.ambient} />}
       <Effects ref={effectsRef} />
+      <ReadySignal />
       <LookControls
         controlsRef={controlsRef}
         sensitivity={settings.sensitivity}
