@@ -93,18 +93,12 @@
   }
 }
 
-/* Plus-shaped crosshair with a dark outline so it stays visible on any wall colour. */
+/* Drawn by modules/Crosshair from the player's settings; centred on the screen centre. */
 .crosshair {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 22px;
-  height: 22px;
   transform: translate(-50%, -50%);
-  background:
-    linear-gradient(#fff, #fff) center / 2px 100% no-repeat,
-    linear-gradient(#fff, #fff) center / 100% 2px no-repeat;
-  filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000);
 }
 
 .hint {

@@ -1,10 +1,11 @@
 import { useGame } from '../Context';
+import { Crosshair } from '../Crosshair';
 import { MODES } from '../../game/modes';
 import { calculateScore, formatAccuracy } from '../../game/scoring';
 import styles from './index.module.css';
 
 export default function Hud() {
-  const { game } = useGame();
+  const { game, settings } = useGame();
   const { mode, timeLeft, elapsed, lives, hits, clicks, expired } = game;
   const { lives: maxLives, untimed } = MODES[mode];
 
@@ -26,7 +27,7 @@ export default function Hud() {
         )}
         <Stat label="Accuracy" value={formatAccuracy(hits, clicks)} />
       </div>
-      <div className={styles.crosshair} />
+      <Crosshair className={styles.crosshair} {...settings.crosshair} />
       <div className={styles.hint}>Esc to end run</div>
     </div>
   );

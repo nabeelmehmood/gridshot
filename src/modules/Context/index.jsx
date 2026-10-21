@@ -5,6 +5,7 @@ import { createInitialState, gameReducer, PHASES } from '../../game/state';
 import { resetStreak, unlockAudio } from '../../sound';
 import { readStored, writeStored } from '../../storage';
 import { DEFAULT_THEME, THEMES } from '../../themes';
+import { CROSSHAIR_STYLES } from '../Crosshair';
 
 export const DEFAULT_SETTINGS = {
   sensitivity: 1,
@@ -12,14 +13,30 @@ export const DEFAULT_SETTINGS = {
   volume: 0.6,
   theme: DEFAULT_THEME,
   effects: true,
-  rawInput: false
+  rawInput: false,
+  crosshair: { style: 'cross', color: '#ffffff', size: 22, thickness: 2, gap: 4, outline: true }
 };
 
 export const SETTING_LIMITS = {
   sensitivity: { min: 0.05, max: 3, step: 0.05 },
   fov: { min: 40, max: 100, step: 1 },
-  volume: { min: 0, max: 1, step: 0.05 }
+  volume: { min: 0, max: 1, step: 0.05 },
+  crosshairSize: { min: 8, max: 48, step: 1 },
+  crosshairThickness: { min: 1, max: 6, step: 0.5 },
+  crosshairGap: { min: 0, max: 12, step: 1 }
 };
+
+const CROSSHAIR_STYLE_IDS = CROSSHAIR_STYLES.map(style => style.id);
+const within = (value, { min, max }) => typeof value === 'number' && value >= min && value <= max;
+const isCrosshair = value =>
+  value !== null &&
+  typeof value === 'object' &&
+  CROSSHAIR_STYLE_IDS.includes(value.style) &&
+  /^#[0-9a-f]{6}$/i.test(value.color) &&
+  within(value.size, SETTING_LIMITS.crosshairSize) &&
+  within(value.thickness, SETTING_LIMITS.crosshairThickness) &&
+  within(value.gap, SETTING_LIMITS.crosshairGap) &&
+  typeof value.outline === 'boolean';
 
 const LOCK_ERROR = 'Mouse capture was blocked. Wait a second and press Start again.';
 const EMPTY_LEADERBOARD = { status: 'loading', users: [] };
@@ -55,7 +72,8 @@ const loadSettings = () => ({
   volume: readStored('volume', inRange('volume'), DEFAULT_SETTINGS.volume),
   theme: readStored('theme', value => Boolean(THEMES[value]), DEFAULT_SETTINGS.theme),
   effects: readStored('effects', value => typeof value === 'boolean', DEFAULT_SETTINGS.effects),
-  rawInput: readStored('rawInput', value => typeof value === 'boolean', DEFAULT_SETTINGS.rawInput)
+  rawInput: readStored('rawInput', value => typeof value === 'boolean', DEFAULT_SETTINGS.rawInput),
+  crosshair: readStored('crosshair', isCrosshair, DEFAULT_SETTINGS.crosshair)
 });
 
 // By default the browser applies the OS pointer speed and acceleration, so 1× feels like the desktop.
@@ -101,6 +119,7 @@ export function GameContextProvider({ children }) {
     writeStored('volume', settings.volume);
     writeStored('theme', settings.theme);
     writeStored('effects', settings.effects);
+    writeStored('crosshair', settings.crosshair);
   }, [settings]);
 
   useEffect(() => {

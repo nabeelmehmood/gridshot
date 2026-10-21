@@ -6,6 +6,7 @@ import { cleanName } from '../../game/username';
 import { readStored, writeStored } from '../../storage';
 import { THEME_IDS, THEMES } from '../../themes';
 import { DEFAULT_SETTINGS, SETTING_LIMITS, useGame } from '../Context';
+import { Crosshair, CROSSHAIR_STYLES } from '../Crosshair';
 import Leaderboard from '../Leaderboard';
 import SaveScore from '../Leaderboard/SaveScore';
 import styles from './index.module.css';
@@ -27,7 +28,7 @@ export default function Menu() {
   const [step, setStep] = useState(() =>
     !hasPointer || readStored('onboarded', isBoolean, false) ? null : STEPS[0]
   );
-  const [open, setOpen] = useState({ mode: false, theme: false });
+  const [open, setOpen] = useState({ mode: false, theme: false, crosshair: false });
   const [peek, setPeek] = useState(false);
 
   const finishOnboarding = () => {
@@ -85,6 +86,17 @@ export default function Menu() {
             {step === 'theme' && <StepBanner {...guide} label="Pick a theme. It previews behind this menu." next="Next: start" />}
             <ThemePicker onPreview={hasPointer ? undefined : () => setPeek(true)} />
           </Collapsible>
+          {hasPointer && (
+            <Collapsible
+              title="Crosshair"
+              summary={<Crosshair {...settings.crosshair} scale={Math.min(1, 22 / (settings.crosshair.size + 8))} />}
+              open={step ? false : open.crosshair}
+              onToggle={step ? undefined : toggle('crosshair')}
+              dimmed={Boolean(step)}
+            >
+              <CrosshairPicker />
+            </Collapsible>
+          )}
         </div>
         {hasPointer && (
           <aside className={`${styles.card} ${styles.settingsCard}`} aria-labelledby="settings-title">
@@ -379,11 +391,12 @@ function Settings() {
     setSettings(current => ({ ...current, [key]: value }));
   };
   const toggle = key => event => setSettings(current => ({ ...current, [key]: event.target.checked }));
-  // The theme has its own card, so resetting settings leaves it alone.
+  // The theme and crosshair have their own cards, so resetting settings leaves them alone.
   const isDefault = Object.keys(DEFAULT_SETTINGS).every(
-    key => key === 'theme' || settings[key] === DEFAULT_SETTINGS[key]
+    key => key === 'theme' || key === 'crosshair' || settings[key] === DEFAULT_SETTINGS[key]
   );
-  const reset = () => setSettings(current => ({ ...DEFAULT_SETTINGS, theme: current.theme }));
+  const reset = () =>
+    setSettings(current => ({ ...DEFAULT_SETTINGS, theme: current.theme, crosshair: current.crosshair }));
 
   return (
     <section className={styles.settings}>
@@ -428,6 +441,108 @@ function Settings() {
         Reset to defaults
       </button>
     </section>
+  );
+}
+
+const CROSSHAIR_COLORS = ['#ffffff', '#00ff6a', '#22e6ff', '#ffe600', '#ff2bd6', '#ff3b3b'];
+
+// Shape, colour, size, thickness and gap, with a live preview over a dark and a light backdrop so
+// it can be judged against any theme.
+function CrosshairPicker() {
+  const { settings, setSettings } = useGame();
+  const crosshair = settings.crosshair;
+  const set = patch => setSettings(current => ({ ...current, crosshair: { ...current.crosshair, ...patch } }));
+  const number = key => event => set({ [key]: Number(event.target.value) });
+  const hasLines = ['cross', 'crossDot', 't'].includes(crosshair.style);
+  const isDefault = JSON.stringify(crosshair) === JSON.stringify(DEFAULT_SETTINGS.crosshair);
+
+  return (
+    <div className={styles.crosshairPicker}>
+      <div className={styles.crosshairPreview} aria-hidden="true">
+        <div className={styles.previewDark}>
+          <Crosshair {...crosshair} />
+        </div>
+        <div className={styles.previewLight}>
+          <Crosshair {...crosshair} />
+        </div>
+      </div>
+
+      <fieldset className={styles.crosshairStyles}>
+        <legend className={styles.srOnly}>Crosshair shape</legend>
+        {CROSSHAIR_STYLES.map(({ id, label }) => (
+          <label key={id} className={styles.crosshairStyle} title={label}>
+            <input
+              type="radio"
+              name="crosshair-style"
+              value={id}
+              checked={crosshair.style === id}
+              onChange={() => set({ style: id })}
+            />
+            <Crosshair style={id} color="#ffffff" size={18} thickness={2} gap={3} outline={false} />
+            <span className={styles.srOnly}>{label}</span>
+          </label>
+        ))}
+      </fieldset>
+
+      <fieldset className={styles.crosshairColors}>
+        <legend className={styles.srOnly}>Crosshair colour</legend>
+        {CROSSHAIR_COLORS.map(color => (
+          <label key={color} className={styles.colorSwatch} style={{ background: color }} title={color}>
+            <input
+              type="radio"
+              name="crosshair-color"
+              value={color}
+              checked={crosshair.color === color}
+              onChange={() => set({ color })}
+            />
+            <span className={styles.srOnly}>{color}</span>
+          </label>
+        ))}
+        <label className={styles.customColor} title="Custom colour">
+          <input type="color" value={crosshair.color} onChange={event => set({ color: event.target.value })} />
+          <span className={styles.srOnly}>Custom colour</span>
+        </label>
+      </fieldset>
+
+      <Slider
+        id="crosshair-size"
+        label="Size"
+        value={crosshair.size}
+        display={`${crosshair.size}px`}
+        onChange={number('size')}
+        {...SETTING_LIMITS.crosshairSize}
+      />
+      <Slider
+        id="crosshair-thickness"
+        label="Thickness"
+        value={crosshair.thickness}
+        display={`${crosshair.thickness}px`}
+        onChange={number('thickness')}
+        {...SETTING_LIMITS.crosshairThickness}
+      />
+      {hasLines && (
+        <Slider
+          id="crosshair-gap"
+          label="Centre gap"
+          value={crosshair.gap}
+          display={`${crosshair.gap}px`}
+          onChange={number('gap')}
+          {...SETTING_LIMITS.crosshairGap}
+        />
+      )}
+      <label className={styles.toggle}>
+        <input type="checkbox" checked={crosshair.outline} onChange={event => set({ outline: event.target.checked })} />
+        Dark outline
+      </label>
+      <button
+        type="button"
+        className={styles.linkButton}
+        onClick={() => set(DEFAULT_SETTINGS.crosshair)}
+        disabled={isDefault}
+      >
+        Reset crosshair
+      </button>
+    </div>
   );
 }
 
