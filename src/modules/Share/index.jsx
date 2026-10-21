@@ -5,14 +5,15 @@ import { useGame } from '../Context';
 import styles from './index.module.css';
 
 export const SITE_URL = 'https://nabeelmehmood.github.io/gridshot/';
-const ISSUES_URL = 'https://github.com/nabeelmehmood/gridshot/issues/new';
 
-// Google Form for feedback: the form's "viewform" URL. Until it's set, only "Report a bug" shows.
+// Google Form for feedback and bug reports.
 const FEEDBACK_FORM_URL =
   'https://docs.google.com/forms/d/e/1FAIpQLSe3uEpQ_sHsJWA7uowx9UGIr7JD-C52MNJv8ZMP3jkJn3-rYA/viewform';
-// Optional: entry id of the form's "Game info" question (from "Get pre-filled link"), e.g.
-// 'entry.123456789'. It gets filled with the player's mode, theme and browser.
+// Entry ids from the form's "Get pre-filled link". Game info gets the player's mode, theme and browser;
+// the topic must match one of the "What's it about?" options exactly.
 const FEEDBACK_GAME_INFO_ENTRY = 'entry.961657182';
+const FEEDBACK_TOPIC_ENTRY = 'entry.1327230019';
+const BUG_TOPIC = 'Bug';
 
 function browserSummary() {
   const agent = navigator.userAgent;
@@ -31,9 +32,9 @@ function browserSummary() {
   return `${browser} on ${platform}, ${window.innerWidth}×${window.innerHeight}`;
 }
 
-function feedbackUrl(gameInfo) {
-  if (!FEEDBACK_GAME_INFO_ENTRY) return FEEDBACK_FORM_URL;
+function feedbackUrl(gameInfo, topic) {
   const params = new URLSearchParams({ usp: 'pp_url', [FEEDBACK_GAME_INFO_ENTRY]: gameInfo });
+  if (topic) params.set(FEEDBACK_TOPIC_ENTRY, topic);
   return `${FEEDBACK_FORM_URL}?${params}`;
 }
 
@@ -99,9 +100,7 @@ export function scoreShareText(score, modeName) {
 
 export function ShareAndFeedback() {
   const { game, settings } = useGame();
-  const formUrl =
-    FEEDBACK_FORM_URL &&
-    feedbackUrl(`${MODES[game.mode].name} · ${THEMES[settings.theme].name} · ${browserSummary()}`);
+  const gameInfo = `${MODES[game.mode].name} · ${THEMES[settings.theme].name} · ${browserSummary()}`;
   return (
     <div className={styles.shareAndFeedback}>
       <section aria-labelledby="share-title" className={styles.section}>
@@ -118,12 +117,15 @@ export function ShareAndFeedback() {
           Ideas, a mode you&apos;d like, or found a bug? I read everything, so get in touch.
         </p>
         <div className={styles.shareRow}>
-          {formUrl && (
-            <a className={`${styles.pill} ${styles.primary}`} href={formUrl} target="_blank" rel="noopener noreferrer">
-              Send feedback
-            </a>
-          )}
-          <a className={styles.pill} href={ISSUES_URL} target="_blank" rel="noopener noreferrer">
+          <a
+            className={`${styles.pill} ${styles.primary}`}
+            href={feedbackUrl(gameInfo)}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Send feedback
+          </a>
+          <a className={styles.pill} href={feedbackUrl(gameInfo, BUG_TOPIC)} target="_blank" rel="noopener noreferrer">
             Report a bug
           </a>
         </div>
