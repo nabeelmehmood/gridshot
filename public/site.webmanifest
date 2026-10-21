@@ -1,12 +1,18 @@
 {
-  "name": "Gridshot - Aim Trainer",
+  "name": "Gridshot – Free Aim Trainer",
   "short_name": "Gridshot",
+  "description": "Free browser aim trainer for FPS warmups: 8 modes, 8 themes and global leaderboards.",
   "start_url": ".",
+  "scope": ".",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "categories": ["games"],
   "icons": [
-    { "src": "android-chrome-192x192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "android-chrome-512x512.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "android-chrome-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "android-chrome-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "maskable-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "theme_color": "#0d1017",
-  "background_color": "#0d1017",
-  "display": "fullscreen"
+  "background_color": "#0d1017"
 }

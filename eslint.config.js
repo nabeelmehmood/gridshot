@@ -18,5 +18,9 @@ export default [
       // Without eslint-plugin-react, JSX usage isn't seen; only flag unused non-component vars.
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z]' }]
     }
+  },
+  {
+    files: ['scripts/**/*.mjs'],
+    languageOptions: { globals: globals.node }
   }
 ];

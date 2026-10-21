@@ -29,6 +29,20 @@ runtime, so there are no image downloads. Targets always sit on the theme's back
 thin outline so they never blend into the scenery. "Particles and effects" in Settings turns off
 ambient particles, hit sparks, miss marks and the vignette for slower machines.
 
+## Icons and social preview
+
+Favicons, app icons (including a maskable one for Android) and `og-image.png` (the 1200×630
+link preview) live in `public/` and are generated from the SVG sources in `assets/`:
+
+```bash
+npm run assets
+```
+
+Re-run it after editing a source or a theme's `swatch` colours (the preview shows every theme's
+badge). SEO tags, Open Graph/Twitter tags and JSON-LD structured data are in `index.html`;
+`public/sitemap.xml` can be submitted in Google Search Console. A project site can't serve
+`robots.txt` (crawlers only read it from the domain root), and it isn't needed to be indexed.
+
 ## Mouse sensitivity
 
 1.00× is desktop-matched: one pixel of mouse movement moves the point under the crosshair one pixel
