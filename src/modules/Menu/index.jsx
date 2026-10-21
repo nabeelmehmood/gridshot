@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { calculateScore, formatAccuracy, POINTS } from '../../game/scoring';
+import { calculateScore, formatAccuracy, POINTS, STREAK_STEP } from '../../game/scoring';
 import { MODE_IDS, MODES } from '../../game/modes';
 import { bestRunOf, PHASES } from '../../game/state';
 import { cleanName } from '../../game/username';
@@ -226,7 +226,7 @@ function MainCard({ onOpenLeaderboard, guide, dimmed, onStarted }) {
             {finished ? 'Play again' : 'Start'}
           </button>
           <p className={styles.rules}>
-            Hit +{POINTS.HIT} · Miss {POINTS.MISS}
+            Hit +{POINTS.HIT} · Miss {POINTS.MISS} · {STREAK_STEP} in a row ×1.1, up to ×1.4
             {mode.expiredLabel && ` · ${mode.expiredLabel} ${POINTS.EXPIRED}`}
             {mode.untimed && ` · ${mode.lives} lives`} · Esc ends the run
           </p>
@@ -349,9 +349,9 @@ function ThemeBadge({ colors: [top, wave, bottom] }) {
 }
 
 function Results({ game }) {
-  const { mode, hits, clicks, expired, elapsed, newBest, completed } = game;
+  const { mode, hits, clicks, expired, bonus, bestStreak, elapsed, newBest, completed } = game;
   const { expiredLabel, untimed, name } = MODES[mode];
-  const score = calculateScore(hits, clicks, expired);
+  const score = calculateScore(hits, clicks, expired, bonus);
   return (
     <section className={styles.results} aria-label="Run results">
       <div className={styles.scoreBlock}>
@@ -364,6 +364,8 @@ function Results({ game }) {
         {expiredLabel && <Stat label={expiredLabel} value={expired} />}
         {untimed && <Stat label="Survived" value={`${elapsed}s`} />}
         <Stat label="Accuracy" value={formatAccuracy(hits, clicks)} />
+        <Stat label="Best streak" value={bestStreak} />
+        <Stat label="Streak bonus" value={`+${bonus}`} />
       </dl>
       {completed && score > 0 && (
         <div className={styles.shareScore}>

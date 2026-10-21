@@ -19,7 +19,7 @@ const SCORES = 'LeaderboardScores';
 const RUNS = 'Runs';
 
 // Must match src/game/username.js.
-const USERNAME_PATTERN = /^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$/;
+const USERNAME_PATTERN = /^(?=[a-zA-Z0-9._-]{3,16}$)(?!.*[._-]{2})[^._-].*[^._-]$/;
 
 // Must match MODES in src/game/modes.js.
 //   maxExpired  expired targets one run can report (Pop-in lives 1.1s; Skeet throws one per 1.2s)
@@ -37,14 +37,24 @@ const MODE_RULES = {
 const MODES = Object.keys(MODE_RULES);
 const DEFAULT_MODE = 'gridshot';
 // Must match src/game/scoring.js.
-const POINTS = { HIT: 10, MISS: -5, EXPIRED: -5 };
+const POINTS = { HIT: 10, MISS: -10, EXPIRED: -5 };
+// Every STREAK_STEP hits in a row adds +1 to each hit, up to +MAX_STREAK_BONUS.
+const STREAK_STEP = 10;
+const MAX_STREAK_BONUS = 4;
 
-// Timed runs: 4 hits/s for a whole minute is beyond any human; ~3/s is world-class.
+// Hit order isn't reported, so the claimed bonus is capped at what one unbroken streak of `hits` earns.
+function maxStreakBonus(hits) {
+  let total = 0;
+  for (let streak = 1; streak <= hits; streak++) total += Math.min(Math.floor(streak / STREAK_STEP), MAX_STREAK_BONUS);
+  return total;
+}
+
+// Timed runs: 5 hits/s for a whole minute is beyond any human; ~3/s is very good.
 const RUN_DURATION_MS = 60 * 1000;
-const MAX_HITS = 240;
+const MAX_HITS = 300;
 const MAX_CLICKS = 1000;
 // Untimed runs: the same rates against the run's real length, with a hard ceiling (~40 minutes of play).
-const MAX_HITS_PER_SECOND = 4;
+const MAX_HITS_PER_SECOND = 5;
 const MAX_CLICKS_PER_SECOND = 15;
 const MAX_UNTIMED_HITS = 3000;
 const MAX_UNTIMED_CLICKS = 15000;
@@ -108,9 +118,9 @@ exports.addScore = runtime.https.onRequest((req, res) =>
     if (rateLimited('addScore', req, res)) return undefined;
     if (req.method !== 'POST') return fail(res, 405, 'Use POST.');
 
-    const { username, runId, hits, clicks, expired = 0 } = req.body || {};
+    const { username, runId, hits, clicks, expired = 0, bonus = 0 } = req.body || {};
     if (typeof username !== 'string' || !USERNAME_PATTERN.test(username)) {
-      return fail(res, 400, 'Username must be 3-20 characters: letters, numbers, dots or underscores.');
+      return fail(res, 400, 'Names are 3-16 characters: letters, numbers, dots, dashes or underscores.');
     }
     if (profanity.isProfane(username)) return fail(res, 400, 'Please pick a different name.');
     if (
@@ -119,7 +129,9 @@ exports.addScore = runtime.https.onRequest((req, res) =>
       !Number.isInteger(hits) ||
       !Number.isInteger(clicks) ||
       !Number.isInteger(expired) ||
+      !Number.isInteger(bonus) ||
       expired < 0 ||
+      bonus < 0 ||
       hits < 0 ||
       hits > clicks ||
       hits > MAX_UNTIMED_HITS ||
@@ -127,13 +139,14 @@ exports.addScore = runtime.https.onRequest((req, res) =>
     ) {
       return fail(res, 400, 'Invalid run.');
     }
+    if (bonus > maxStreakBonus(hits)) return fail(res, 400, 'Invalid run.');
 
     // The client never sends a score; it is derived from the reported counts.
-    const score = hits * POINTS.HIT + (clicks - hits) * POINTS.MISS + expired * POINTS.EXPIRED;
+    const score = hits * POINTS.HIT + bonus + (clicks - hits) * POINTS.MISS + expired * POINTS.EXPIRED;
     if (score <= 0) return fail(res, 400, 'Only positive scores go on the leaderboard.');
 
     try {
-      await db.runTransaction(async tx => {
+      const result = await db.runTransaction(async tx => {
         const runRef = db.collection(RUNS).doc(runId);
         const run = await tx.get(runRef);
         if (!run.exists || run.get('usedAt')) throw new RejectedRun('This run was already submitted or is unknown.');
@@ -158,19 +171,27 @@ exports.addScore = runtime.https.onRequest((req, res) =>
           if (hits > MAX_HITS || clicks > MAX_CLICKS) throw new RejectedRun('Invalid run.');
         }
 
+        // One entry per player per mode, so the board shows each name once with their best run.
+        const bestRef = db.collection(SCORES).doc(`${mode}_${username.toLowerCase()}`);
+        const best = await tx.get(bestRef);
         tx.update(runRef, { usedAt: FieldValue.serverTimestamp() });
-        tx.create(db.collection(SCORES).doc(), {
+        if (best.exists && best.get('score') >= score) {
+          return `Your best of ${best.get('score')} still stands.`;
+        }
+        tx.set(bestRef, {
           username,
           mode,
           score,
           hits,
           clicks,
           expired,
+          bonus,
           runId,
           createdAt: FieldValue.serverTimestamp()
         });
+        return `Saved ${score} for ${username}.`;
       });
-      return res.json({ success: true, result: `Saved ${score} for ${username}.` });
+      return res.json({ success: true, result });
     } catch (error) {
       if (error instanceof RejectedRun) return fail(res, 400, error.message);
       functions.logger.error('addScore failed', error);

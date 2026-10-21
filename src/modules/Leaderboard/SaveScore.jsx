@@ -53,7 +53,7 @@ export default function SaveScore() {
           type="text"
           autoComplete="nickname"
           placeholder="Your name"
-          maxLength={20}
+          maxLength={16}
           value={username}
           aria-invalid={Boolean(error)}
           aria-describedby={error ? 'username-error' : undefined}

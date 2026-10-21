@@ -169,7 +169,12 @@ export function GameContextProvider({ children }) {
   const recordSavedScore = useCallback((boardMode, entry) => {
     setLeaderboards(current => {
       const board = current[boardMode] ?? EMPTY_LEADERBOARD;
-      const users = [...board.users, entry].sort((a, b) => b.score - a.score).slice(0, 50);
+      // The server keeps one entry per name (its best), so mirror that here.
+      const name = entry.username.toLowerCase();
+      const previous = board.users.find(user => user.username.toLowerCase() === name);
+      if (previous && previous.score >= entry.score) return current;
+      const others = board.users.filter(user => user.username.toLowerCase() !== name);
+      const users = [...others, entry].sort((a, b) => b.score - a.score).slice(0, 50);
       return { ...current, [boardMode]: { status: 'ready', users } };
     });
   }, []);

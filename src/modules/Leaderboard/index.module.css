@@ -91,6 +91,9 @@
 }
 
 .list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -98,25 +101,24 @@
 
 .row {
   display: grid;
-  grid-template-columns: 36px 1fr auto;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: 10px;
+  padding: 9px 14px 9px 10px;
   border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
   font-variant-numeric: tabular-nums;
 }
 
-.row:nth-child(odd) {
-  background: rgba(255, 255, 255, 0.03);
-}
-
 .ownRow {
-  outline: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .rank {
   font-family: var(--font-display);
   font-weight: 700;
+  text-align: center;
   color: var(--muted);
 }
 
@@ -133,9 +135,28 @@
 }
 
 .name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.nameText {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.you {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .score {

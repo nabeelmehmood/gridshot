@@ -31,12 +31,12 @@ export async function registerRun(mode) {
   return data.runId;
 }
 
-// The server recomputes the score from hits/clicks and checks them against the run token.
-export async function submitScore(username, { runId, hits, clicks, expired }) {
+// The server recomputes the score from the counts and checks them against the run token.
+export async function submitScore(username, { runId, hits, clicks, expired, bonus = 0 }) {
   const res = await fetch(`${API_BASE}/addScore`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, runId, hits, clicks, expired })
+    body: JSON.stringify({ username, runId, hits, clicks, expired, bonus })
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.success) {

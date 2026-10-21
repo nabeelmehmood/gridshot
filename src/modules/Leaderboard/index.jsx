@@ -83,17 +83,23 @@ export default function Leaderboard({ onClose }) {
 
         {leaderboard.users.length > 0 && (
           <ol className={styles.list}>
-            {leaderboard.users.map((user, index) => (
-              <li
-                key={`${index}-${user.username}`}
-                className={`${styles.row} ${user.username === ownName ? styles.ownRow : ''}`}
-                data-rank={index + 1}
-              >
-                <span className={styles.rank}>{index + 1}</span>
-                <span className={styles.name}>{cleanName(user.username)}</span>
-                <span className={styles.score}>{user.score}</span>
-              </li>
-            ))}
+            {leaderboard.users.map((user, index) => {
+              const own = user.username === ownName;
+              return (
+                <li
+                  key={`${index}-${user.username}`}
+                  className={`${styles.row} ${own ? styles.ownRow : ''}`}
+                  data-rank={index + 1}
+                >
+                  <span className={styles.rank}>{index + 1}</span>
+                  <span className={styles.name}>
+                    <span className={styles.nameText}>{cleanName(user.username)}</span>
+                    {own && <span className={styles.you}>you</span>}
+                  </span>
+                  <span className={styles.score}>{user.score}</span>
+                </li>
+              );
+            })}
           </ol>
         )}
       </div>

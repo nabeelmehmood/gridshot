@@ -1,4 +1,4 @@
-import { calculateScore, GAME_DURATION } from './scoring';
+import { calculateScore, GAME_DURATION, STREAK_STEP, streakBonus } from './scoring';
 import { DEFAULT_MODE, MODES, newRolls, nextTarget, respawnTarget, spawnTargets, survivalTargetCount } from './modes';
 
 export const PHASES = {
@@ -7,7 +7,11 @@ export const PHASES = {
   FINISHED: 'finished'
 };
 
-// bestRuns[mode]: { score, hits, clicks, expired, runId, saved } for the best completed run.
+// bonus: streak points earned this run. streakBreaks counts broken streaks of STREAK_STEP or more,
+// with lostStreak the length of the last one, so the HUD can flash when one breaks.
+const FRESH_STREAK = { streak: 0, bestStreak: 0, bonus: 0, streakBreaks: 0, lostStreak: 0 };
+
+// bestRuns[mode]: { score, hits, clicks, expired, bonus, bestStreak, runId, saved } for the best completed run.
 // runId is the server token that makes it submittable (null if the server couldn't be reached).
 export function createInitialState({ mode = DEFAULT_MODE, bestRuns = {} } = {}) {
   return {
@@ -19,6 +23,7 @@ export function createInitialState({ mode = DEFAULT_MODE, bestRuns = {} } = {}) 
     hits: 0,
     clicks: 0,
     expired: 0,
+    ...FRESH_STREAK,
     targets: spawnTargets(mode, 0, newRolls()),
     nextKey: 3,
     runKey: null,
@@ -30,6 +35,22 @@ export function createInitialState({ mode = DEFAULT_MODE, bestRuns = {} } = {}) 
 }
 
 export const bestRunOf = state => state.bestRuns[state.mode] ?? null;
+
+function breakStreak(state) {
+  if (state.streak < STREAK_STEP) return { ...state, streak: 0 };
+  return { ...state, streak: 0, streakBreaks: state.streakBreaks + 1, lostStreak: state.streak };
+}
+
+function countHit(state) {
+  const streak = state.streak + 1;
+  return {
+    ...state,
+    hits: state.hits + 1,
+    streak,
+    bestStreak: Math.max(state.bestStreak, streak),
+    bonus: state.bonus + streakBonus(streak)
+  };
+}
 
 function withTargets(state, targets) {
   const keys = targets.map(target => target.key);
@@ -53,8 +74,8 @@ function topUpSurvival(state, rolls) {
 
 // Only runs that end on their own (timer out, or lives out in Survival) count; Esc can't set a best.
 function finishRun(state, completed) {
-  const { mode, hits, clicks, expired, runId } = state;
-  const score = calculateScore(hits, clicks, expired);
+  const { mode, hits, clicks, expired, bonus, bestStreak, runId } = state;
+  const score = calculateScore(hits, clicks, expired, bonus);
   const newBest = completed && score > (bestRunOf(state)?.score ?? 0);
   return {
     ...state,
@@ -62,7 +83,7 @@ function finishRun(state, completed) {
     completed,
     newBest,
     bestRuns: newBest
-      ? { ...state.bestRuns, [mode]: { score, hits, clicks, expired, runId, saved: false } }
+      ? { ...state.bestRuns, [mode]: { score, hits, clicks, expired, bonus, bestStreak, runId, saved: false } }
       : state.bestRuns
   };
 }
@@ -86,6 +107,7 @@ export function gameReducer(state, action) {
           hits: 0,
           clicks: 0,
           expired: 0,
+          ...FRESH_STREAK,
           runKey: action.runKey,
           runId: null,
           completed: false,
@@ -114,8 +136,9 @@ export function gameReducer(state, action) {
     case 'shot': {
       if (state.phase !== PHASES.RUNNING) return state;
       const hit = action.targetKey != null && state.targets.some(target => target.key === action.targetKey);
-      const counted = { ...state, clicks: state.clicks + 1, hits: hit ? state.hits + 1 : state.hits };
-      if (!hit) return counted;
+      const clicked = { ...state, clicks: state.clicks + 1 };
+      if (!hit) return breakStreak(clicked);
+      const counted = countHit(clicked);
       // Skeet discs are gone once hit; the launcher sends the next one.
       if (state.mode === 'skeet') return withoutTarget(counted, action.targetKey);
       return topUpSurvival(respawn(counted, action.targetKey, action.rolls), action.rolls);
@@ -124,7 +147,7 @@ export function gameReducer(state, action) {
       if (state.phase !== PHASES.RUNNING || !state.targets.some(target => target.key === action.targetKey)) {
         return state;
       }
-      const counted = { ...state, expired: state.expired + 1 };
+      const counted = breakStreak({ ...state, expired: state.expired + 1 });
       if (state.mode === 'skeet') return withoutTarget(counted, action.targetKey);
       if (state.lives !== null) {
         const lives = state.lives - 1;

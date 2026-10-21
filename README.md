@@ -1,6 +1,6 @@
 # Gridshot
 
-A browser aim trainer for FPS warmups. Every run is 60 seconds; hits are +10, misses -5.
+A browser aim trainer for FPS warmups. Every run is 60 seconds; hits are +10, misses -10, and every 10 hits in a row adds +1 per hit (up to ×1.4).
 
 Play it at https://nabeelmehmood.github.io/gridshot/
 

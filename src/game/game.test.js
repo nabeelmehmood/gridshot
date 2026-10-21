@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { calculateAccuracy, calculateScore, formatAccuracy, GAME_DURATION } from './scoring';
+import {
+  calculateAccuracy,
+  calculateScore,
+  formatAccuracy,
+  GAME_DURATION,
+  maxStreakBonus,
+  streakBonus
+} from './scoring';
 import { MODES, ROLL_COUNT, respawnTarget, skeetPosition, spawnTargets, strafePosition } from './modes';
 import { pickFreeSlot, pickTargets, TARGET_SLOTS } from './targets';
 import { bestRunOf, createInitialState, gameReducer, PHASES } from './state';
+import { USERNAME_PATTERN } from './username';
 
 const rolls = value => Array.from({ length: ROLL_COUNT }, () => value);
 const play = (state, ...actions) => actions.reduce(gameReducer, state);
@@ -12,8 +20,8 @@ const shot = targetKey => ({ type: 'shot', targetKey, rolls: rolls(0.6) });
 
 describe('scoring', () => {
   it('awards hits and penalises misses and expired targets', () => {
-    expect(calculateScore(10, 12)).toBe(90);
-    expect(calculateScore(0, 3)).toBe(-15);
+    expect(calculateScore(10, 12)).toBe(80);
+    expect(calculateScore(0, 3)).toBe(-30);
     expect(calculateScore(4, 4, 2)).toBe(30);
   });
 
@@ -70,7 +78,16 @@ describe('game lifecycle', () => {
 
     state = play(state, { type: 'runRegistered', runKey: 7, runId: 'run-abc' }, ...ticks(GAME_DURATION));
     expect(state).toMatchObject({ phase: PHASES.FINISHED, timeLeft: 0, completed: true, newBest: true });
-    expect(bestRunOf(state)).toEqual({ score: 15, hits: 2, clicks: 3, expired: 0, runId: 'run-abc', saved: false });
+    expect(bestRunOf(state)).toEqual({
+      score: 10,
+      hits: 2,
+      clicks: 3,
+      expired: 0,
+      bonus: 0,
+      bestStreak: 1,
+      runId: 'run-abc',
+      saved: false
+    });
 
     // Input after the run ends is ignored.
     expect(play(state, shot(state.targets[0].key), { type: 'tick' })).toBe(state);
@@ -198,5 +215,53 @@ describe('game lifecycle', () => {
     expect(play(running, { type: 'selectMode', mode: 'gridshot', rolls: rolls(0.5) })).toBe(running);
     expect(play(state, { type: 'selectMode', mode: 'nope', rolls: rolls(0.5) })).toBe(state);
     expect(Object.keys(MODES)).toEqual(['gridshot', 'strafe', 'popin', 'skeet', 'spidershot', 'microshot', 'bounce', 'survival']);
+  });
+});
+
+describe('usernames', () => {
+  it('allows usual gamertags', () => {
+    for (const name of ['Nabeel', 'aim_god', 'x-ray.99', 'abc', 'Sixteen_chars-ok']) {
+      expect(USERNAME_PATTERN.test(name), name).toBe(true);
+    }
+  });
+
+  it('rejects odd characters, edge symbols and long names', () => {
+    for (const name of ['ab', 'seventeen_chars_x', 'has space', 'émile', 'x<script>', 'zalgo̵', '_lead', 'trail-', 'a..b', 'a_-b', '😀😀😀']) {
+      expect(USERNAME_PATTERN.test(name), name).toBe(false);
+    }
+  });
+});
+
+describe('streaks', () => {
+  const hitFirst = state => shot(state.targets[0].key);
+  const hitMany = (state, n) => {
+    for (let i = 0; i < n; i++) state = play(state, hitFirst(state));
+    return state;
+  };
+
+  it('adds +1 per hit for every 10 in a row, capped at +4', () => {
+    expect([1, 9, 10, 19, 20, 39, 40, 200].map(streakBonus)).toEqual([0, 0, 1, 1, 2, 3, 4, 4]);
+    expect(maxStreakBonus(9)).toBe(0);
+    expect(maxStreakBonus(12)).toBe(3);
+    expect(maxStreakBonus(50)).toBe(10 + 20 + 30 + 11 * 4);
+  });
+
+  it('builds a bonus, and a miss resets the streak and flags the break', () => {
+    let state = hitMany(play(createInitialState(), start()), 12);
+    expect(state).toMatchObject({ streak: 12, bestStreak: 12, bonus: 3, streakBreaks: 0 });
+    state = play(state, shot(null));
+    expect(state).toMatchObject({ streak: 0, bestStreak: 12, bonus: 3, streakBreaks: 1, lostStreak: 12 });
+    state = play(state, ...ticks(GAME_DURATION));
+    expect(bestRunOf(state)).toMatchObject({ score: 120 + 3 - 10, bonus: 3, bestStreak: 12 });
+  });
+
+  it('lets short streaks break quietly and resets on expired targets', () => {
+    let state = play(createInitialState({ mode: 'popin' }), start());
+    state = hitMany(state, 5);
+    state = play(state, shot(null));
+    expect(state).toMatchObject({ streak: 0, streakBreaks: 0 });
+    state = hitMany(state, 10);
+    state = play(state, { type: 'expire', targetKey: state.targets[0].key, rolls: rolls(0.4) });
+    expect(state).toMatchObject({ streak: 0, streakBreaks: 1, lostStreak: 10, bonus: 1 });
   });
 });
