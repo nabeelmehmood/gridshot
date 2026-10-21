@@ -1,5 +1,12 @@
 import { useId, useState } from 'react';
-import { calculateScore, formatAccuracy, POINTS, STREAK_STEP } from '../../game/scoring';
+import {
+  calculateScore,
+  formatAccuracy,
+  MAX_STREAK_BONUS,
+  POINTS,
+  STREAK_STEP,
+  streakMultiplier
+} from '../../game/scoring';
 import { MODE_IDS, MODES } from '../../game/modes';
 import { bestRunOf, PHASES } from '../../game/state';
 import { cleanName } from '../../game/username';
@@ -51,7 +58,8 @@ export default function Menu() {
   }
 
   return (
-    <div className={styles.overlay}>
+    <div className={`${styles.overlay} ${hasPointer ? '' : styles.withBanner}`}>
+      {!hasPointer && <PreviewBanner />}
       <div className={styles.layout}>
         <MainCard
           onOpenLeaderboard={() => setShowLeaderboard(true)}
@@ -195,6 +203,8 @@ function MainCard({ onOpenLeaderboard, guide, dimmed, onStarted }) {
         <p className={styles.tagline}>Aim warmups for FPS games. Every miss costs points.</p>
       </header>
 
+      {!hasPointer && <PlayOnComputer />}
+
       <p className={styles.currentMode}>
         <span className={styles.currentModeName}>{mode.name}</span>
         {mode.description}
@@ -212,7 +222,6 @@ function MainCard({ onOpenLeaderboard, guide, dimmed, onStarted }) {
       {canSave && <SaveScore />}
       {finished && game.newBest && bestRun?.saved && <p className={styles.success}>Saved to the leaderboard.</p>}
 
-      {!hasPointer && <PlayOnComputer />}
       {lockError && (
         <p role="alert" className={styles.warning}>
           {lockError}
@@ -225,13 +234,10 @@ function MainCard({ onOpenLeaderboard, guide, dimmed, onStarted }) {
           <button type="button" className={`${styles.startButton} ${startStep ? styles.pulse : ''}`} onClick={start} autoFocus>
             {finished ? 'Play again' : 'Start'}
           </button>
-          <p className={styles.rules}>
-            Hit +{POINTS.HIT} · Miss {POINTS.MISS} · {STREAK_STEP} in a row ×1.1, up to ×1.4
-            {mode.expiredLabel && ` · ${mode.expiredLabel} ${POINTS.EXPIRED}`}
-            {mode.untimed && ` · ${mode.lives} lives`} · Esc ends the run
-          </p>
+          <ScoringRules mode={mode} />
         </>
       )}
+      {!hasPointer && <ScoringRules mode={mode} />}
 
       <footer className={styles.footer}>
         <span className={styles.topScorer}>
@@ -255,6 +261,78 @@ function MainCard({ onOpenLeaderboard, guide, dimmed, onStarted }) {
   );
 }
 
+// Point values as chips, then the streak ladder: every STREAK_STEP hits in a row is one rung.
+const STREAK_RUNGS = Array.from({ length: MAX_STREAK_BONUS + 1 }, (_, tier) => tier * STREAK_STEP);
+
+function ScoringRules({ mode }) {
+  return (
+    <section className={styles.rules} aria-label="Scoring">
+      <ul className={styles.ruleChips}>
+        <li className={`${styles.ruleChip} ${styles.good}`}>
+          <strong>+{POINTS.HIT}</strong> hit
+        </li>
+        <li className={`${styles.ruleChip} ${styles.bad}`}>
+          <strong>{POINTS.MISS}</strong> miss
+        </li>
+        {mode.expiredLabel && (
+          <li className={`${styles.ruleChip} ${styles.bad}`}>
+            <strong>{POINTS.EXPIRED}</strong> {mode.expiredLabel.toLowerCase()}
+          </li>
+        )}
+        {mode.untimed && (
+          <li className={styles.ruleChip}>
+            <strong>{mode.lives}</strong> lives
+          </li>
+        )}
+      </ul>
+      <div className={styles.ladder}>
+        <span className={styles.ladderTitle}>
+          Streak bonus <span className={styles.ladderNote}>hits in a row · a miss resets it</span>
+        </span>
+        <ol className={styles.rungs}>
+          {STREAK_RUNGS.map((hits, tier) => (
+            <li key={hits} className={styles.rung} data-tier={tier}>
+              <span className={styles.rungMultiplier}>×{streakMultiplier(hits).toFixed(1)}</span>
+              <span className={styles.rungHits}>
+                {tier === MAX_STREAK_BONUS ? `${hits}+` : `${hits}–${hits + STREAK_STEP - 1}`}
+              </span>
+            </li>
+          ))}
+        </ol>
+      </div>
+      {hasPointer && (
+        <p className={styles.escHint}>
+          Press <kbd className={styles.kbd}>Esc</kbd> to end the run
+        </p>
+      )}
+    </section>
+  );
+}
+
+function PreviewBanner() {
+  const [copied, copy] = useCopyLink();
+  return (
+    <div className={styles.previewBanner} role="note">
+      <span className={styles.previewTag}>Preview</span>
+      <span className={styles.previewText}>Not playable on phones. Needs a mouse.</span>
+      <button type="button" className={styles.previewButton} onClick={copy}>
+        {copied ? 'Copied' : 'Copy link'}
+      </button>
+    </div>
+  );
+}
+
+function MouseIcon() {
+  return (
+    <svg className={styles.mouseIcon} viewBox="0 0 48 64" aria-hidden="true">
+      <rect x="6" y="4" width="36" height="56" rx="18" fill="none" stroke="currentColor" strokeWidth="3" />
+      <line x1="24" y1="4" x2="24" y2="26" stroke="currentColor" strokeWidth="3" />
+      <line x1="6" y1="26" x2="42" y2="26" stroke="currentColor" strokeWidth="3" />
+      <rect className={styles.mouseWheel} x="21" y="11" width="6" height="10" rx="3" fill="currentColor" />
+    </svg>
+  );
+}
+
 function PlayOnComputer() {
   const [copied, copy] = useCopyLink();
   const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
@@ -262,12 +340,13 @@ function PlayOnComputer() {
 
   return (
     <section className={styles.playOnComputer} aria-labelledby="play-on-computer">
+      <MouseIcon />
       <h2 id="play-on-computer" className={styles.playOnComputerTitle}>
-        Play on a computer
+        You&apos;re looking at a preview
       </h2>
       <p className={styles.playOnComputerText}>
-        Gridshot trains your mouse aim, so it needs a mouse and keyboard. Send yourself the link and play on your
-        computer.
+        Gridshot is a <strong>mouse</strong> aim trainer, so it can&apos;t be played on a phone or tablet. Send
+        yourself the link and play on a computer.
       </p>
       {canShare && (
         <button type="button" className={styles.startButton} onClick={share}>
@@ -277,7 +356,7 @@ function PlayOnComputer() {
       <button type="button" className={canShare ? styles.secondaryButton : styles.startButton} onClick={copy}>
         {copied ? 'Link copied' : 'Copy link'}
       </button>
-      <p className={styles.playOnComputerHint}>Meanwhile, browse the modes, themes and leaderboard below.</p>
+      <p className={styles.playOnComputerHint}>You can still browse the modes, themes and leaderboard here.</p>
     </section>
   );
 }

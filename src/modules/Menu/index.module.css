@@ -586,10 +586,232 @@
 }
 
 .rules {
-  margin: -8px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: -4px;
+}
+
+.ruleChips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ruleChip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 4px 11px;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.ruleChip strong {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.good strong {
+  color: var(--success);
+}
+
+.bad strong {
+  color: var(--danger);
+}
+
+.ladder {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ladderTitle {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.ladderNote {
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+/* Rungs rise and fill in with the accent as the multiplier grows. */
+.rungs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: end;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rung {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 1px;
+  padding: 5px 2px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.rung[data-tier='1'] {
+  min-height: 46px;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.rung[data-tier='2'] {
+  min-height: 52px;
+  background: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.rung[data-tier='3'] {
+  min-height: 58px;
+  background: color-mix(in srgb, var(--accent) 82%, transparent);
+}
+
+.rung[data-tier='4'] {
+  min-height: 64px;
+  background: var(--accent);
+  box-shadow: 0 0 14px -4px var(--accent);
+}
+
+.rungMultiplier {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.rungHits {
+  font-size: 10px;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+
+.rung[data-tier='3'] .rungMultiplier,
+.rung[data-tier='3'] .rungHits,
+.rung[data-tier='4'] .rungMultiplier,
+.rung[data-tier='4'] .rungHits {
+  color: var(--accent-text);
+}
+
+.escHint {
+  margin: 0;
   font-size: 12px;
   text-align: center;
   color: var(--muted);
+}
+
+.kbd {
+  display: inline-block;
+  margin: 0 2px;
+  padding: 1px 6px;
+  border: 1px solid var(--panel-border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Phones: a pinned strip so it's clear from the first glance that this is a preview. */
+.withBanner {
+  padding-top: 72px;
+}
+
+.previewBanner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--accent);
+  background: var(--panel);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+
+.previewTag {
+  flex: none;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.previewText {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.previewButton {
+  flex: none;
+  padding: 7px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: none;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mouseIcon {
+  align-self: center;
+  width: 34px;
+  height: 46px;
+  color: var(--accent);
+}
+
+.mouseWheel {
+  animation: wheel 1.6s ease-in-out infinite;
+}
+
+@keyframes wheel {
+  50% {
+    transform: translateY(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mouseWheel {
+    animation: none;
+  }
 }
 
 .success,
