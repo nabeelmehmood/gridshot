@@ -1,58 +1,216 @@
-const functions = require('firebase-functions');
-const cors = require('cors')({ origin: true });
+// v1 API keeps these as 1st-gen functions: switching an existing function to 2nd gen
+// requires deleting and recreating it, which would change nothing for players.
+const functions = require('firebase-functions/v1');
+const { initializeApp } = require('firebase-admin/app');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { Filter } = require('bad-words');
+const { clientIp, createLimiter } = require('./rateLimit');
+const { disableProjectBilling, KILL_SWITCH_TOPIC, shouldDisableBilling, spendLimit } = require('./killSwitch');
+const cors = require('cors')({
+  origin: ['https://nabeelmehmood.github.io', /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/]
+});
 
-// The Firebase Admin SDK to access Firestore.
-const admin = require('firebase-admin');
-admin.initializeApp();
+initializeApp();
+const db = getFirestore();
+const profanity = new Filter();
 
-// // Create and deploy your first functions
-// // https://firebase.google.com/docs/functions/get-started
-//
+// 'UserScores' holds the pre-validation leaderboard full of forged entries; it is no longer read.
+const SCORES = 'LeaderboardScores';
+const RUNS = 'Runs';
 
-exports.addScore = functions.https.onRequest(async (req, res) => {
+// Must match src/game/username.js.
+const USERNAME_PATTERN = /^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$/;
+
+// Must match src/game/modes.js and src/game/scoring.js.
+const MODES = ['gridshot', 'strafe', 'popin'];
+const DEFAULT_MODE = 'gridshot';
+const POINTS = { HIT: 10, MISS: -5, EXPIRED: -5 };
+// Pop-in targets live 1.1s, so a 60s run can't expire more than ~55.
+const MAX_EXPIRED = 60;
+const RUN_DURATION_MS = 60 * 1000;
+// 4 hits/s for a whole minute is beyond any human; ~3/s is world-class.
+const MAX_HITS = 240;
+const MAX_CLICKS = 1000;
+
+// A run can't be submitted before its timer could have run out (minus timer/network slack),
+// and its token expires after a week.
+const MIN_RUN_MS = RUN_DURATION_MS - 3000;
+const RUN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+const LEADERBOARD_SIZE = 50;
+const LEADERBOARD_CACHE_MS = 30 * 1000;
+
+// Cost guardrails. Billing grows with instances × time and with Firestore operations, so each
+// function is capped at MAX_INSTANCES and rate limited per minute before touching Firestore.
+// Worst case under a sustained flood is a few dollars a month instead of unbounded.
+const MAX_INSTANCES = 2;
+const runtime = functions.runWith({ maxInstances: MAX_INSTANCES, memory: '128MB', timeoutSeconds: 10 });
+
+// A run takes 60s, so 5 starts/min per player leaves room for restarts after Esc.
+const limits = {
+  startRun: createLimiter({ name: 'startRun', perIp: 5, total: 30, logger: functions.logger }),
+  addScore: createLimiter({ name: 'addScore', perIp: 5, total: 20, logger: functions.logger }),
+  getTopScores: createLimiter({ name: 'getTopScores', perIp: 30, total: 300, logger: functions.logger })
+};
+
+class RejectedRun extends Error {}
+
+const fail = (res, status, result) => res.status(status).json({ success: false, result });
+
+function rateLimited(name, req, res) {
+  if (limits[name](clientIp(req))) return false;
+  res.set('Retry-After', '60');
+  fail(res, 429, 'Too many requests. Try again in a minute.');
+  return true;
+}
+
+// Per instance; each function runs in its own instances, so addScore can't invalidate it.
+const leaderboardCache = new Map();
+
+// Issues a single-use token at the start of a run. Scores are only accepted against a token
+// old enough for a full run to have been played, so they can't be forged with a single request.
+exports.startRun = runtime.https.onRequest((req, res) =>
   cors(req, res, async () => {
-    const user = req.body && req.body.user;
-    if (user.username && user.score) {
-      if (usernameRegex.test(user.username)) {
-        const writeResult = await admin
-          .firestore()
-          .collection('UserScores')
-          .add(user);
-        res.json({
-          success: true,
-          result: `User with ID: ${writeResult.id} added. With score: ${user.score}`
+    if (rateLimited('startRun', req, res)) return undefined;
+    if (req.method !== 'POST') return fail(res, 405, 'Use POST.');
+    const mode = req.body && req.body.mode;
+    if (!MODES.includes(mode)) return fail(res, 400, 'Unknown mode.');
+    try {
+      const run = await db.collection(RUNS).add({ mode, startedAt: FieldValue.serverTimestamp() });
+      return res.json({ runId: run.id });
+    } catch (error) {
+      functions.logger.error('startRun failed', error);
+      return fail(res, 500, 'Could not start a run.');
+    }
+  })
+);
+
+exports.addScore = runtime.https.onRequest((req, res) =>
+  cors(req, res, async () => {
+    if (rateLimited('addScore', req, res)) return undefined;
+    if (req.method !== 'POST') return fail(res, 405, 'Use POST.');
+
+    const { username, runId, hits, clicks, expired = 0 } = req.body || {};
+    if (typeof username !== 'string' || !USERNAME_PATTERN.test(username)) {
+      return fail(res, 400, 'Username must be 3-20 characters: letters, numbers, dots or underscores.');
+    }
+    if (profanity.isProfane(username)) return fail(res, 400, 'Please pick a different name.');
+    if (
+      typeof runId !== 'string' ||
+      !/^[A-Za-z0-9]{1,64}$/.test(runId) ||
+      !Number.isInteger(hits) ||
+      !Number.isInteger(clicks) ||
+      !Number.isInteger(expired) ||
+      expired < 0 ||
+      expired > MAX_EXPIRED ||
+      hits < 0 ||
+      hits > clicks ||
+      hits > MAX_HITS ||
+      clicks > MAX_CLICKS
+    ) {
+      return fail(res, 400, 'Invalid run.');
+    }
+
+    // The client never sends a score; it is derived from the reported counts.
+    const score = hits * POINTS.HIT + (clicks - hits) * POINTS.MISS + expired * POINTS.EXPIRED;
+    if (score <= 0) return fail(res, 400, 'Only positive scores go on the leaderboard.');
+
+    try {
+      await db.runTransaction(async tx => {
+        const runRef = db.collection(RUNS).doc(runId);
+        const run = await tx.get(runRef);
+        if (!run.exists || run.get('usedAt')) throw new RejectedRun('This run was already submitted or is unknown.');
+
+        const startedAt = run.get('startedAt');
+        const elapsed = Date.now() - (startedAt ? startedAt.toMillis() : Date.now());
+        if (elapsed < MIN_RUN_MS) throw new RejectedRun('Run finished too quickly.');
+        if (elapsed > RUN_TTL_MS) throw new RejectedRun('This run is too old to submit.');
+
+        // The mode comes from the token, not the request, so scores can't be filed under another mode.
+        const mode = run.get('mode');
+        if (!MODES.includes(mode)) throw new RejectedRun('Unknown mode.');
+        if (mode !== 'popin' && expired !== 0) throw new RejectedRun('Invalid run.');
+
+        tx.update(runRef, { usedAt: FieldValue.serverTimestamp() });
+        tx.create(db.collection(SCORES).doc(), {
+          username,
+          mode,
+          score,
+          hits,
+          clicks,
+          expired,
+          runId,
+          createdAt: FieldValue.serverTimestamp()
         });
+      });
+      return res.json({ success: true, result: `Saved ${score} for ${username}.` });
+    } catch (error) {
+      if (error instanceof RejectedRun) return fail(res, 400, error.message);
+      functions.logger.error('addScore failed', error);
+      return fail(res, 500, 'Could not save your score. Please try again.');
+    }
+  })
+);
+
+exports.getTopScores = runtime.https.onRequest((req, res) =>
+  cors(req, res, async () => {
+    if (rateLimited('getTopScores', req, res)) return undefined;
+    if (req.method !== 'GET') return fail(res, 405, 'Use GET.');
+    const mode = (req.query && req.query.mode) || DEFAULT_MODE;
+    if (!MODES.includes(mode)) return fail(res, 400, 'Unknown mode.');
+
+    try {
+      // Each uncached load costs LEADERBOARD_SIZE reads, so serve repeats from memory.
+      const cached = leaderboardCache.get(mode);
+      let users;
+      if (cached && Date.now() - cached.at < LEADERBOARD_CACHE_MS) {
+        users = cached.users;
       } else {
-        res.json({
-          success: false,
-          result:
-            'Username must be between 3-12 characters and only contain alpha-numerics'
-        });
+        // Needs the (mode, score desc) composite index in firestore.indexes.json.
+        const snapshot = await db
+          .collection(SCORES)
+          .where('mode', '==', mode)
+          .orderBy('score', 'desc')
+          .limit(LEADERBOARD_SIZE)
+          .get();
+        users = snapshot.docs.map(doc => ({
+          username: doc.get('username'),
+          score: doc.get('score')
+        }));
+        leaderboardCache.set(mode, { users, at: Date.now() });
       }
-    } else res.json({ success: false });
-  });
-});
+      res.set('Cache-Control', 'public, max-age=30');
+      return res.json({ users });
+    } catch (error) {
+      functions.logger.error('getTopScores failed', error);
+      return fail(res, 500, 'Could not load the leaderboard.');
+    }
+  })
+);
 
-exports.getTopScores = functions.https.onRequest(async (req, res) => {
-  cors(req, res, async () => {
-    const list = await (
-      await admin
-        .firestore()
-        .collection('UserScores')
-        .orderBy('score', 'desc')
-        .limit(50)
-        .get()
-    ).docs;
-    const users = list.map(item => {
-      return {
-        score: item.get('score'),
-        username: item.get('username'),
-        hits: item.get('hits'),
-        misses: item.get('misses')
-      };
-    });
-    res.json({ users });
-  });
-});
+// Connected to a Cloud Billing budget; disables billing once spend reaches the budget (see README).
+exports.stopBilling = functions
+  .runWith({ maxInstances: 1, memory: '128MB', timeoutSeconds: 30 })
+  .pubsub.topic(KILL_SWITCH_TOPIC)
+  .onPublish(async message => {
+    let notification = null;
+    try {
+      notification = message.json;
+    } catch {
+      functions.logger.error('[KillSwitch] ignoring non-JSON message');
+      return;
+    }
 
-const usernameRegex = /^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$/;
+    const { costAmount, currencyCode } = notification || {};
+    if (notification && currencyCode !== 'USD') {
+      functions.logger.warn(`[KillSwitch] billed in ${currencyCode}, so the $5 ceiling is off; using the budget only`);
+    }
+    const limit = notification ? spendLimit(notification) : Infinity;
+    if (!shouldDisableBilling(notification)) {
+      functions.logger.info(`[KillSwitch] under limit: ${costAmount} of ${limit} ${currencyCode}`);
+      return;
+    }
+    functions.logger.warn(`[KillSwitch] limit reached: ${costAmount} of ${limit} ${currencyCode}`);
+    // Let errors throw so they show up as function failures in the logs.
+    await disableProjectBilling(functions.logger);
+  });
