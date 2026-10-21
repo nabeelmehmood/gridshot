@@ -10,12 +10,12 @@ import { DEFAULT_SETTINGS, SETTING_LIMITS, useGame } from '../Context';
 import { Crosshair, CROSSHAIR_STYLES } from '../Crosshair';
 import Leaderboard from '../Leaderboard';
 import SaveScore from '../Leaderboard/SaveScore';
+import { nativeShare, scoreShareText, ShareAndFeedback, ShareButtons, useCopyLink } from '../Share';
 import styles from './index.module.css';
 
 // Phones and tablets without a mouse get a showcase: browse modes, themes and the leaderboard, but
 // no Start (the game is built on mouse capture) and no mouse settings.
 const hasPointer = hasFinePointer;
-const SHARE_URL = 'https://nabeelmehmood.github.io/gridshot/';
 
 // First visit walks through mode → theme → start; after that the picks are collapsible cards.
 const STEPS = ['mode', 'theme', 'start'];
@@ -99,14 +99,19 @@ export default function Menu() {
             </Collapsible>
           )}
         </div>
-        {hasPointer && (
-          <aside className={`${styles.card} ${styles.settingsCard}`} aria-labelledby="settings-title">
-            <h2 id="settings-title" className={styles.cardTitle}>
-              Settings
-            </h2>
-            <Settings />
+        <div className={styles.side}>
+          {hasPointer && (
+            <aside className={styles.card} aria-labelledby="settings-title">
+              <h2 id="settings-title" className={styles.cardTitle}>
+                Settings
+              </h2>
+              <Settings />
+            </aside>
+          )}
+          <aside className={styles.card} aria-label="Share and feedback">
+            <ShareAndFeedback />
           </aside>
-        )}
+        </div>
       </div>
 
       {showLeaderboard && <Leaderboard onClose={() => setShowLeaderboard(false)} />}
@@ -251,22 +256,9 @@ function MainCard({ onOpenLeaderboard, guide, dimmed, onStarted }) {
 }
 
 function PlayOnComputer() {
-  const [copied, setCopied] = useState(false);
+  const [copied, copy] = useCopyLink();
   const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(SHARE_URL);
-      setCopied(true);
-    } catch {
-      setCopied(false);
-    }
-  };
-  // Dismissing the share sheet rejects; nothing to report.
-  const share = () =>
-    navigator
-      .share({ title: 'Gridshot – Free Aim Trainer', text: 'Free aim trainer to play on my computer', url: SHARE_URL })
-      .catch(() => {});
+  const share = () => nativeShare('Free aim trainer to play on my computer');
 
   return (
     <section className={styles.playOnComputer} aria-labelledby="play-on-computer">
@@ -357,12 +349,13 @@ function ThemeBadge({ colors: [top, wave, bottom] }) {
 }
 
 function Results({ game }) {
-  const { mode, hits, clicks, expired, elapsed, newBest } = game;
-  const { expiredLabel, untimed } = MODES[mode];
+  const { mode, hits, clicks, expired, elapsed, newBest, completed } = game;
+  const { expiredLabel, untimed, name } = MODES[mode];
+  const score = calculateScore(hits, clicks, expired);
   return (
     <section className={styles.results} aria-label="Run results">
       <div className={styles.scoreBlock}>
-        <span className={styles.scoreValue}>{calculateScore(hits, clicks, expired)}</span>
+        <span className={styles.scoreValue}>{score}</span>
         <span className={styles.scoreLabel}>{newBest ? 'New personal best!' : 'Score'}</span>
       </div>
       <dl className={styles.statGrid}>
@@ -372,6 +365,12 @@ function Results({ game }) {
         {untimed && <Stat label="Survived" value={`${elapsed}s`} />}
         <Stat label="Accuracy" value={formatAccuracy(hits, clicks)} />
       </dl>
+      {completed && score > 0 && (
+        <div className={styles.shareScore}>
+          <span className={styles.shareScoreLabel}>Share your score</span>
+          <ShareButtons text={scoreShareText(score, name)} />
+        </div>
+      )}
     </section>
   );
 }

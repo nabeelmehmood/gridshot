@@ -55,8 +55,26 @@
   min-width: 0;
 }
 
-.settingsCard {
+.side {
   grid-area: side;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.shareScore {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.shareScoreLabel {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 /* Guided first visit: the current step's card glows, the others step back. */
