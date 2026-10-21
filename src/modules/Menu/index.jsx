@@ -18,6 +18,7 @@ import { DEFAULT_SETTINGS, SETTING_LIMITS, useGame } from '../Context';
 import { Crosshair, CROSSHAIR_STYLES } from '../Crosshair';
 import Leaderboard from '../Leaderboard';
 import SaveScore from '../Leaderboard/SaveScore';
+import ScoreCardButton from '../ScoreCard';
 import { nativeShare, scoreShareText, ShareAndFeedback, ShareButtons, useCopyLink } from '../Share';
 import styles from './index.module.css';
 
@@ -33,7 +34,8 @@ const isBoolean = value => typeof value === 'boolean';
 // Narrow windows stack them with the main card first.
 export default function Menu() {
   const { game, settings } = useGame();
-  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  // null, or which view of the leaderboard dialog is open: 'board' or 'stats'.
+  const [leaderboardView, setLeaderboardView] = useState(null);
   const [step, setStep] = useState(() =>
     !hasPointer || readStored('onboarded', isBoolean, false) ? null : STEPS[0]
   );
@@ -67,7 +69,7 @@ export default function Menu() {
       {!hasPointer && <PreviewBanner />}
       <div className={styles.layout}>
         <MainCard
-          onOpenLeaderboard={() => setShowLeaderboard(true)}
+          onOpenLeaderboard={setLeaderboardView}
           guide={guide}
           dimmed={step === 'mode' || step === 'theme'}
           onStarted={step ? finishOnboarding : undefined}
@@ -127,7 +129,7 @@ export default function Menu() {
         </div>
       </div>
 
-      {showLeaderboard && <Leaderboard onClose={() => setShowLeaderboard(false)} />}
+      {leaderboardView && <Leaderboard initialView={leaderboardView} onClose={() => setLeaderboardView(null)} />}
     </div>
   );
 }
@@ -194,13 +196,36 @@ function MainCard({ onOpenLeaderboard, guide, dimmed, onStarted }) {
 
   const openLeaderboard = () => {
     track('leaderboard_open', { mode: game.mode });
-    onOpenLeaderboard();
+    onOpenLeaderboard('board');
     loadLeaderboard(game.mode);
+  };
+  const openStats = () => {
+    track('stats_open', { mode: game.mode });
+    onOpenLeaderboard('stats');
   };
   const start = () => {
     onStarted?.();
     requestStart();
   };
+
+  // Space or R starts (or restarts) a run, so playing again doesn't need the mouse.
+  useEffect(() => {
+    if (!hasPointer) return undefined;
+    const handleKey = event => {
+      if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
+      const isSpace = event.code === 'Space';
+      if (!isSpace && event.code !== 'KeyR') return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"], dialog')) return;
+      // Space already presses whatever button has focus.
+      if (isSpace && target?.closest('button, a, label, summary')) return;
+      event.preventDefault();
+      onStarted?.();
+      requestStart();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [onStarted, requestStart]);
 
   return (
     <main className={`${styles.card} ${styles.mainCard} ${startStep ? styles.active : ''} ${dimmed ? styles.dimmed : ''}`}>
@@ -259,9 +284,16 @@ function MainCard({ onOpenLeaderboard, guide, dimmed, onStarted }) {
             </>
           )}
         </span>
-        <button type="button" className={styles.linkButton} onClick={openLeaderboard}>
-          Leaderboard
-        </button>
+        <span className={styles.footerLinks}>
+          {hasPointer && (
+            <button type="button" className={styles.linkButton} onClick={openStats}>
+              Your stats
+            </button>
+          )}
+          <button type="button" className={styles.linkButton} onClick={openLeaderboard}>
+            Leaderboard
+          </button>
+        </span>
       </footer>
     </main>
   );
@@ -308,7 +340,8 @@ function ScoringRules({ mode }) {
       </div>
       {hasPointer && (
         <p className={styles.escHint}>
-          Press <kbd className={styles.kbd}>Esc</kbd> to end the run
+          <kbd className={styles.kbd}>Space</kbd> or <kbd className={styles.kbd}>R</kbd> to start ·{' '}
+          <kbd className={styles.kbd}>Esc</kbd> to end the run
         </p>
       )}
     </section>
@@ -467,6 +500,9 @@ function Results({ game }) {
         <div className={styles.shareScore}>
           <span className={styles.shareScoreLabel}>Share your score</span>
           <ShareButtons text={scoreShareText(score, name)} where="results" />
+          <ScoreCardButton
+            run={{ score, modeName: name, accuracy: formatAccuracy(hits, clicks), bestStreak, hits, newBest }}
+          />
         </div>
       )}
     </section>

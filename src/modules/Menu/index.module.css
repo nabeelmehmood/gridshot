@@ -971,3 +971,8 @@
   color: var(--muted);
   text-decoration: none;
 }
+
+.footerLinks {
+  display: flex;
+  gap: 14px;
+}

@@ -4,7 +4,7 @@ import { fetchTopScores, registerRun } from '../../api';
 import { DEFAULT_MODE, MODES, newRolls } from '../../game/modes';
 import { calculateAccuracy, calculateScore } from '../../game/scoring';
 import { createInitialState, gameReducer, PHASES } from '../../game/state';
-import { resetStreak, unlockAudio } from '../../sound';
+import { playCountdown, resetStreak, unlockAudio } from '../../sound';
 import { readStored, writeStored } from '../../storage';
 import { DEFAULT_THEME, THEMES } from '../../themes';
 import { CROSSHAIR_STYLES } from '../Crosshair';
@@ -60,11 +60,27 @@ const isBestRuns = value =>
   typeof value === 'object' &&
   Object.entries(value).every(([mode, run]) => MODES[mode] && isBestRun(run));
 
+const isHistory = value =>
+  value !== null &&
+  typeof value === 'object' &&
+  Object.entries(value).every(
+    ([mode, entry]) =>
+      MODES[mode] &&
+      Number.isInteger(entry?.count) &&
+      Array.isArray(entry.runs) &&
+      entry.runs.every(run => Number.isInteger(run?.score) && Number.isInteger(run.hits) && Number.isInteger(run.clicks))
+  );
+
+// 3, 2, 1 between the camera arriving and the run starting.
+const COUNTDOWN_FROM = 3;
+const COUNTDOWN_STEP_MS = 600;
+
 // New key on purpose: bests from before run tokens ('topScore') can't be submitted, so they
 // start over together with the leaderboard.
 const loadProgress = () => ({
   mode: readStored('mode', value => Boolean(MODES[value]), DEFAULT_MODE),
-  bestRuns: readStored('bestRuns', isBestRuns, {})
+  bestRuns: readStored('bestRuns', isBestRuns, {}),
+  history: readStored('runHistory', isHistory, {})
 });
 
 // 'lookSensitivity' replaces 'mouseSpeed' (and the older 'sensitivity'): 1 now means desktop-matched,
@@ -106,7 +122,7 @@ export function GameContextProvider({ children }) {
   const controlsRef = useRef(null);
   const runCounter = useRef(0);
 
-  const { phase, mode, bestRuns } = game;
+  const { phase, mode, bestRuns, history } = game;
 
   // One event per run as it ends: finished runs report the result, Esc reports how long it lasted.
   const { completed, hits, clicks, expired, bonus, bestStreak, newBest, elapsed } = game;
@@ -132,6 +148,10 @@ export function GameContextProvider({ children }) {
   useEffect(() => {
     writeStored('bestRuns', bestRuns);
   }, [bestRuns]);
+
+  useEffect(() => {
+    writeStored('runHistory', history);
+  }, [history]);
 
   useEffect(() => {
     writeStored('lookSensitivity', settings.sensitivity);
@@ -228,16 +248,35 @@ export function GameContextProvider({ children }) {
 
   // Camera view: 'menu' → 'entering' while the camera glides in (the menu is gone but the run hasn't
   // started) → 'game' once it arrives; back to 'menu' the moment the pointer unlocks.
+  // In 'game', countdown runs 3 → 1 before the run itself starts.
   const [view, setView] = useState('menu');
+  const [countdown, setCountdown] = useState(0);
   const beginEntering = useCallback(() => setView('entering'), []);
   const enterGame = useCallback(() => {
     setView('game');
-    startRun();
-  }, [startRun]);
+    setCountdown(COUNTDOWN_FROM);
+    playCountdown(false, settings.volume);
+  }, [settings.volume]);
   const leaveGame = useCallback(() => {
     setView('menu');
+    setCountdown(0);
     endRun();
   }, [endRun]);
+
+  useEffect(() => {
+    if (countdown <= 0) return undefined;
+    const timer = setTimeout(() => {
+      if (countdown > 1) {
+        setCountdown(countdown - 1);
+        playCountdown(false, settings.volume);
+      } else {
+        setCountdown(0);
+        playCountdown(true, settings.volume);
+        startRun();
+      }
+    }, COUNTDOWN_STEP_MS);
+    return () => clearTimeout(timer);
+  }, [countdown, settings.volume, startRun]);
   const shoot = useCallback(targetKey => dispatch({ type: 'shot', targetKey, rolls: newRolls() }), []);
   const expire = useCallback(targetKey => dispatch({ type: 'expire', targetKey, rolls: newRolls() }), []);
   const selectMode = useCallback(nextMode => {
@@ -258,6 +297,7 @@ export function GameContextProvider({ children }) {
     controlsRef,
     requestStart,
     view,
+    countdown,
     beginEntering,
     enterGame,
     leaveGame,

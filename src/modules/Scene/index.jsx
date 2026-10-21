@@ -81,7 +81,8 @@ function ReadySignal() {
 }
 
 export default function Scene() {
-  const { game, settings, controlsRef, beginEntering, enterGame, leaveGame, shoot, expire, reportLockError } = useGame();
+  const { game, settings, view, controlsRef, beginEntering, enterGame, leaveGame, shoot, expire, reportLockError } =
+    useGame();
   const targetsRef = useRef(null);
   const environmentRef = useRef(null);
   const effectsRef = useRef(null);
@@ -99,6 +100,8 @@ export default function Scene() {
         mode={game.mode}
         targets={game.targets}
         running={game.phase === PHASES.RUNNING}
+        // The run spawns fresh targets, so the old ones are hidden from the glide in until it starts.
+        visible={view === 'menu' || game.phase === PHASES.RUNNING}
         onExpire={expire}
         color={theme.targetColor}
         outline={theme.outline}

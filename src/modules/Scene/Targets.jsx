@@ -179,12 +179,12 @@ function ExpiryTimer({ targetKey, lifetimeMs, running, onExpire }) {
   return null;
 }
 
-export default function Targets({ mode, targets, running, onExpire, color, outline, style, halo, haloColor, ref }) {
+export default function Targets({ mode, targets, running, visible, onExpire, color, outline, style, halo, haloColor, ref }) {
   const config = MODES[mode];
   const lifetimeOf = target => target.lifetimeMs ?? config.lifetimeMs ?? null;
 
   return (
-    <group ref={ref} position={[0, 0, -8]}>
+    <group ref={ref} position={[0, 0, -8]} visible={visible}>
       {targets.map(target => {
         const lifetimeMs = lifetimeOf(target);
         return (

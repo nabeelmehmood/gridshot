@@ -11,9 +11,14 @@ export const PHASES = {
 // with lostStreak the length of the last one, so the HUD can flash when one breaks.
 const FRESH_STREAK = { streak: 0, bestStreak: 0, bonus: 0, streakBreaks: 0, lostStreak: 0 };
 
-// bestRuns[mode]: { score, hits, clicks, expired, bonus, bestStreak, runId, saved } for the best completed run.
-// runId is the server token that makes it submittable (null if the server couldn't be reached).
-export function createInitialState({ mode = DEFAULT_MODE, bestRuns = {} } = {}) {
+// Finished runs kept per mode for the stats view.
+export const HISTORY_SIZE = 20;
+
+// bestRuns[mode]: { score, hits, clicks, expired, bonus, bestStreak, timeline, runId, saved } for the best
+// completed run. runId is the server token that makes it submittable (null if the server couldn't be
+// reached). timeline is the score at the end of each second, for pacing the next runs against it.
+// history[mode]: { count, runs } with the last HISTORY_SIZE completed runs, oldest first.
+export function createInitialState({ mode = DEFAULT_MODE, bestRuns = {}, history = {} } = {}) {
   return {
     phase: PHASES.IDLE,
     mode,
@@ -24,17 +29,29 @@ export function createInitialState({ mode = DEFAULT_MODE, bestRuns = {} } = {}) 
     clicks: 0,
     expired: 0,
     ...FRESH_STREAK,
+    timeline: [],
     targets: spawnTargets(mode, 0, newRolls()),
     nextKey: 3,
     runKey: null,
     runId: null,
     completed: false,
     newBest: false,
-    bestRuns
+    bestRuns,
+    history
   };
 }
 
 export const bestRunOf = state => state.bestRuns[state.mode] ?? null;
+
+// Current score minus the best run's score after the same number of seconds; null with nothing to compare.
+export function paceVsBest(state) {
+  const best = bestRunOf(state)?.timeline;
+  const second = state.timeline.length - 1;
+  if (!best || second < 0 || second >= best.length) return null;
+  return state.timeline[second] - best[second];
+}
+
+const scoreOf = state => calculateScore(state.hits, state.clicks, state.expired, state.bonus);
 
 function breakStreak(state) {
   if (state.streak < STREAK_STEP) return { ...state, streak: 0 };
@@ -74,17 +91,22 @@ function topUpSurvival(state, rolls) {
 
 // Only runs that end on their own (timer out, or lives out in Survival) count; Esc can't set a best.
 function finishRun(state, completed) {
-  const { mode, hits, clicks, expired, bonus, bestStreak, runId } = state;
-  const score = calculateScore(hits, clicks, expired, bonus);
+  const { mode, hits, clicks, expired, bonus, bestStreak, timeline, elapsed, runId } = state;
+  const score = scoreOf(state);
   const newBest = completed && score > (bestRunOf(state)?.score ?? 0);
+  const past = state.history[mode] ?? { count: 0, runs: [] };
+  const run = { score, hits, clicks, expired, bonus, bestStreak, seconds: elapsed };
   return {
     ...state,
     phase: PHASES.FINISHED,
     completed,
     newBest,
     bestRuns: newBest
-      ? { ...state.bestRuns, [mode]: { score, hits, clicks, expired, bonus, bestStreak, runId, saved: false } }
-      : state.bestRuns
+      ? { ...state.bestRuns, [mode]: { score, hits, clicks, expired, bonus, bestStreak, timeline, runId, saved: false } }
+      : state.bestRuns,
+    history: completed
+      ? { ...state.history, [mode]: { count: past.count + 1, runs: [...past.runs, run].slice(-HISTORY_SIZE) } }
+      : state.history
   };
 }
 
@@ -108,6 +130,7 @@ export function gameReducer(state, action) {
           clicks: 0,
           expired: 0,
           ...FRESH_STREAK,
+          timeline: [],
           runKey: action.runKey,
           runId: null,
           completed: false,
@@ -128,7 +151,7 @@ export function gameReducer(state, action) {
     }
     case 'tick': {
       if (state.phase !== PHASES.RUNNING) return state;
-      const ticked = { ...state, elapsed: state.elapsed + 1 };
+      const ticked = { ...state, elapsed: state.elapsed + 1, timeline: [...state.timeline, scoreOf(state)] };
       if (MODES[state.mode].untimed) return ticked;
       if (state.timeLeft > 1) return { ...ticked, timeLeft: state.timeLeft - 1 };
       return finishRun({ ...ticked, timeLeft: 0 }, true);

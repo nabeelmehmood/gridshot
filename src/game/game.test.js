@@ -9,7 +9,7 @@ import {
 } from './scoring';
 import { MODES, ROLL_COUNT, respawnTarget, skeetPosition, spawnTargets, strafePosition } from './modes';
 import { pickFreeSlot, pickTargets, TARGET_SLOTS } from './targets';
-import { bestRunOf, createInitialState, gameReducer, PHASES } from './state';
+import { bestRunOf, createInitialState, gameReducer, HISTORY_SIZE, paceVsBest, PHASES } from './state';
 import { USERNAME_PATTERN } from './username';
 
 const rolls = value => Array.from({ length: ROLL_COUNT }, () => value);
@@ -85,6 +85,7 @@ describe('game lifecycle', () => {
       expired: 0,
       bonus: 0,
       bestStreak: 1,
+      timeline: [10, ...Array(GAME_DURATION - 1).fill(10)],
       runId: 'run-abc',
       saved: false
     });
@@ -263,5 +264,37 @@ describe('streaks', () => {
     state = hitMany(state, 10);
     state = play(state, { type: 'expire', targetKey: state.targets[0].key, rolls: rolls(0.4) });
     expect(state).toMatchObject({ streak: 0, streakBreaks: 1, lostStreak: 10, bonus: 1 });
+  });
+});
+
+describe('timeline, history and pacing', () => {
+  const hitFirst = state => shot(state.targets[0].key);
+
+  it('records the score each second, keeps it on the best run, and paces the next run against it', () => {
+    let state = play(createInitialState(), start(1));
+    state = play(state, hitFirst(state), { type: 'tick' });
+    state = play(state, hitFirst(state), { type: 'tick' }, ...ticks(GAME_DURATION - 2));
+    expect(state.timeline.slice(0, 3)).toEqual([10, 20, 20]);
+    expect(bestRunOf(state).timeline).toHaveLength(GAME_DURATION);
+
+    let next = play(state, start(2), { type: 'tick' });
+    expect(paceVsBest(next)).toBe(-10);
+    for (let i = 0; i < 3; i++) next = play(next, hitFirst(next));
+    next = play(next, { type: 'tick' });
+    expect(paceVsBest(next)).toBe(10);
+  });
+
+  it('has no pace without a best run to compare with', () => {
+    const state = play(createInitialState(), start(), { type: 'tick' });
+    expect(paceVsBest(state)).toBeNull();
+  });
+
+  it('keeps the last runs per mode and counts every finished run, but not abandoned ones', () => {
+    let state = createInitialState();
+    for (let run = 0; run < HISTORY_SIZE + 2; run++) state = play(state, start(run), ...ticks(GAME_DURATION));
+    state = play(state, start(99), { type: 'finish' });
+    expect(state.history.gridshot.count).toBe(HISTORY_SIZE + 2);
+    expect(state.history.gridshot.runs).toHaveLength(HISTORY_SIZE);
+    expect(state.history.gridshot.runs.at(-1)).toMatchObject({ score: 0, hits: 0, seconds: GAME_DURATION });
   });
 });

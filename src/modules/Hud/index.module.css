@@ -266,3 +266,58 @@
     animation: none;
   }
 }
+
+.countdown {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin-top: -150px;
+  transform: translateX(-50%);
+  font-family: var(--font-display);
+  font-size: 120px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text);
+  text-shadow:
+    0 0 28px var(--accent),
+    0 0 6px var(--accent),
+    0 4px 12px rgba(0, 0, 0, 0.7);
+  animation: countIn 0.6s ease-out both;
+}
+
+@keyframes countIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) scale(1.6);
+  }
+  20% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) scale(0.94);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .countdown {
+    animation: none;
+  }
+}
+
+/* Pace against the best run, at the foot of the streak panel. */
+.pace {
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.ahead {
+  color: var(--success);
+}
+
+.behind {
+  color: var(--danger);
+}

@@ -48,6 +48,14 @@ export function playShot(hit, volume) {
   }
 }
 
+// Countdown: a short tick for 3, 2, 1 and a brighter one on go.
+export function playCountdown(go, volume) {
+  const ctx = audio();
+  if (!ctx || volume <= 0 || ctx.state !== 'running') return;
+  const pitch = go ? 1046 : 523;
+  blip(ctx, { type: 'square', from: pitch, to: pitch, duration: go ? 0.16 : 0.09, gain: 0.05 * volume });
+}
+
 export function resetStreak() {
   streak = 0;
 }

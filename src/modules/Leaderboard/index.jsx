@@ -3,11 +3,14 @@ import { MODE_IDS, MODES } from '../../game/modes';
 import { cleanName } from '../../game/username';
 import { readStored } from '../../storage';
 import { useGame } from '../Context';
+import StatsPanel from '../Stats';
 import styles from './index.module.css';
 
-export default function Leaderboard({ onClose }) {
+// One dialog, two views over the same mode tabs: the global board and the player's own stats.
+export default function Leaderboard({ onClose, initialView = 'board' }) {
   const { game, leaderboardFor, loadLeaderboard } = useGame();
   const [viewMode, setViewMode] = useState(game.mode);
+  const [view, setView] = useState(initialView);
   const dialogRef = useRef(null);
   const ownName = readStored('username', value => typeof value === 'string', '');
   const leaderboard = leaderboardFor(viewMode);
@@ -32,7 +35,12 @@ export default function Leaderboard({ onClose }) {
 
   const showMode = nextMode => {
     setViewMode(nextMode);
-    loadLeaderboard(nextMode);
+    if (view === 'board') loadLeaderboard(nextMode);
+  };
+
+  const showView = nextView => {
+    setView(nextView);
+    if (nextView === 'board') loadLeaderboard(viewMode);
   };
 
   return (
@@ -45,11 +53,20 @@ export default function Leaderboard({ onClose }) {
     >
       <div className={styles.dialogBody}>
         <header className={styles.dialogHeader}>
-          <h2 id="leaderboard-title">Leaderboard</h2>
+          <h2 id="leaderboard-title">{view === 'board' ? 'Leaderboard' : 'Your stats'}</h2>
           <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Close leaderboard">
             ✕
           </button>
         </header>
+
+        <div className={styles.viewSwitch} role="group" aria-label="Show">
+          <button type="button" aria-pressed={view === 'board'} onClick={() => showView('board')}>
+            Leaderboard
+          </button>
+          <button type="button" aria-pressed={view === 'stats'} onClick={() => showView('stats')}>
+            Your stats
+          </button>
+        </div>
 
         <div className={styles.tabs} role="tablist" aria-label="Game mode">
           {MODE_IDS.map(id => (
@@ -66,10 +83,12 @@ export default function Leaderboard({ onClose }) {
           ))}
         </div>
 
-        {leaderboard.status === 'loading' && leaderboard.users.length === 0 && (
+        {view === 'stats' && <StatsPanel mode={viewMode} />}
+
+        {view === 'board' && leaderboard.status === 'loading' && leaderboard.users.length === 0 && (
           <p className={styles.notice}>Loading scores…</p>
         )}
-        {leaderboard.status === 'error' && (
+        {view === 'board' && leaderboard.status === 'error' && (
           <p className={styles.notice}>
             Couldn&apos;t load the leaderboard.{' '}
             <button type="button" className={styles.linkButton} onClick={() => loadLeaderboard(viewMode)}>
@@ -77,11 +96,11 @@ export default function Leaderboard({ onClose }) {
             </button>
           </p>
         )}
-        {leaderboard.status === 'ready' && leaderboard.users.length === 0 && (
+        {view === 'board' && leaderboard.status === 'ready' && leaderboard.users.length === 0 && (
           <p className={styles.notice}>No scores yet. Be the first.</p>
         )}
 
-        {leaderboard.users.length > 0 && (
+        {view === 'board' && leaderboard.users.length > 0 && (
           <ol className={styles.list}>
             {leaderboard.users.map((user, index) => {
               const own = user.username === ownName;
