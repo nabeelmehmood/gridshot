@@ -1,5 +1,5 @@
 import { calculateScore, GAME_DURATION } from './scoring';
-import { DEFAULT_MODE, MODES, newRolls, respawnTarget, spawnTargets } from './modes';
+import { DEFAULT_MODE, MODES, newRolls, nextTarget, respawnTarget, spawnTargets, survivalTargetCount } from './modes';
 
 export const PHASES = {
   IDLE: 'idle',
@@ -7,13 +7,15 @@ export const PHASES = {
   FINISHED: 'finished'
 };
 
-// bestRuns[mode]: { score, hits, clicks, expired, runId, saved } for the best full-length run.
+// bestRuns[mode]: { score, hits, clicks, expired, runId, saved } for the best completed run.
 // runId is the server token that makes it submittable (null if the server couldn't be reached).
 export function createInitialState({ mode = DEFAULT_MODE, bestRuns = {} } = {}) {
   return {
     phase: PHASES.IDLE,
     mode,
     timeLeft: GAME_DURATION,
+    elapsed: 0,
+    lives: MODES[mode].lives ?? null,
     hits: 0,
     clicks: 0,
     expired: 0,
@@ -30,14 +32,26 @@ export function createInitialState({ mode = DEFAULT_MODE, bestRuns = {} } = {}) 
 export const bestRunOf = state => state.bestRuns[state.mode] ?? null;
 
 function withTargets(state, targets) {
-  return { ...state, targets, nextKey: Math.max(state.nextKey, ...targets.map(target => target.key)) + 1 };
+  const keys = targets.map(target => target.key);
+  return { ...state, targets, nextKey: Math.max(state.nextKey, ...keys, -1) + 1 };
+}
+
+function withoutTarget(state, key) {
+  return { ...state, targets: state.targets.filter(target => target.key !== key) };
 }
 
 function respawn(state, oldKey, rolls) {
-  return withTargets(state, respawnTarget(state.mode, state.targets, oldKey, state.nextKey, rolls));
+  return withTargets(state, respawnTarget(state.mode, state.targets, oldKey, state.nextKey, rolls, state.hits));
 }
 
-// Only runs that reach the end of the timer count: ending early with Esc can't set a best.
+// Survival adds targets as the hit count climbs.
+function topUpSurvival(state, rolls) {
+  if (state.mode !== 'survival' || state.targets.length >= survivalTargetCount(state.hits)) return state;
+  const extra = nextTarget(state.mode, state.targets, null, state.nextKey, [...rolls].reverse(), state.hits);
+  return withTargets(state, [...state.targets, extra]);
+}
+
+// Only runs that end on their own (timer out, or lives out in Survival) count; Esc can't set a best.
 function finishRun(state, completed) {
   const { mode, hits, clicks, expired, runId } = state;
   const score = calculateScore(hits, clicks, expired);
@@ -58,7 +72,7 @@ export function gameReducer(state, action) {
     case 'selectMode':
       if (state.phase === PHASES.RUNNING || !MODES[action.mode]) return state;
       return withTargets(
-        { ...state, phase: PHASES.IDLE, mode: action.mode, newBest: false },
+        { ...state, phase: PHASES.IDLE, mode: action.mode, lives: MODES[action.mode].lives ?? null, newBest: false },
         spawnTargets(action.mode, state.nextKey, action.rolls)
       );
     case 'start':
@@ -67,6 +81,8 @@ export function gameReducer(state, action) {
           ...state,
           phase: PHASES.RUNNING,
           timeLeft: GAME_DURATION,
+          elapsed: 0,
+          lives: MODES[state.mode].lives ?? null,
           hits: 0,
           clicks: 0,
           expired: 0,
@@ -88,21 +104,40 @@ export function gameReducer(state, action) {
         bestRuns: patchBest ? { ...state.bestRuns, [state.mode]: { ...best, runId: action.runId } } : state.bestRuns
       };
     }
-    case 'tick':
+    case 'tick': {
       if (state.phase !== PHASES.RUNNING) return state;
-      if (state.timeLeft > 1) return { ...state, timeLeft: state.timeLeft - 1 };
-      return finishRun({ ...state, timeLeft: 0 }, true);
+      const ticked = { ...state, elapsed: state.elapsed + 1 };
+      if (MODES[state.mode].untimed) return ticked;
+      if (state.timeLeft > 1) return { ...ticked, timeLeft: state.timeLeft - 1 };
+      return finishRun({ ...ticked, timeLeft: 0 }, true);
+    }
     case 'shot': {
       if (state.phase !== PHASES.RUNNING) return state;
       const hit = action.targetKey != null && state.targets.some(target => target.key === action.targetKey);
       const counted = { ...state, clicks: state.clicks + 1, hits: hit ? state.hits + 1 : state.hits };
-      return hit ? respawn(counted, action.targetKey, action.rolls) : counted;
+      if (!hit) return counted;
+      // Skeet discs are gone once hit; the launcher sends the next one.
+      if (state.mode === 'skeet') return withoutTarget(counted, action.targetKey);
+      return topUpSurvival(respawn(counted, action.targetKey, action.rolls), action.rolls);
     }
-    case 'expire':
+    case 'expire': {
       if (state.phase !== PHASES.RUNNING || !state.targets.some(target => target.key === action.targetKey)) {
         return state;
       }
-      return respawn({ ...state, expired: state.expired + 1 }, action.targetKey, action.rolls);
+      const counted = { ...state, expired: state.expired + 1 };
+      if (state.mode === 'skeet') return withoutTarget(counted, action.targetKey);
+      if (state.lives !== null) {
+        const lives = state.lives - 1;
+        if (lives <= 0) return finishRun({ ...withoutTarget(counted, action.targetKey), lives: 0 }, true);
+        return respawn({ ...counted, lives }, action.targetKey, action.rolls);
+      }
+      return respawn(counted, action.targetKey, action.rolls);
+    }
+    case 'launch': {
+      const { maxActive } = MODES[state.mode];
+      if (state.phase !== PHASES.RUNNING || !maxActive || state.targets.length >= maxActive) return state;
+      return withTargets(state, [...state.targets, nextTarget(state.mode, state.targets, null, state.nextKey, action.rolls)]);
+    }
     case 'finish':
       return state.phase === PHASES.RUNNING ? finishRun(state, false) : state;
     case 'scoreSaved': {

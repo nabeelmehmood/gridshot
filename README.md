@@ -9,8 +9,31 @@ Play it at https://nabeelmehmood.github.io/gridshot/
 - **Gridshot**: three static targets on a grid; each hit respawns on a free slot.
 - **Strafe**: one target glides around the wall on a smooth looping path.
 - **Pop-in**: a target appears for 1.1s and shrinks away; letting it expire costs 5.
+- **Skeet**: clay discs are thrown across in a gravity arc, up to two at a time; each one that
+  escapes costs 5.
+- **Spidershot**: a target in the centre, then one somewhere random, then the centre again.
+- **Microshot**: tiny targets hopping around right next to the crosshair.
+- **Bounce**: three balls bouncing around the board.
+- **Survival**: no clock and three lives. Targets shrink away faster as your hits climb, up to
+  three at once; the run ends when three have expired.
 
-Only runs that reach the end of the timer count toward your best (ending early with Esc doesn't).
+Only runs that end on their own (the timer runs out, or Survival's lives do) count toward your
+best; ending early with Esc doesn't. Each mode has its own leaderboard.
+
+## Themes
+
+Playground, Daydream, Kawaii, Pool, Deep space, Neon, Cell block and Classic, picked in Settings.
+Each is defined in `src/themes.js` (target colour and style, backdrop board, particles, UI tint)
+with its scenery in `src/modules/Scene/environments/`. Every texture is drawn on a canvas at
+runtime, so there are no image downloads. Targets always sit on the theme's backdrop board with a
+thin outline so they never blend into the scenery. "Particles and effects" in Settings turns off
+ambient particles, hit sparks, miss marks and the vignette for slower machines.
+
+## Mouse sensitivity
+
+1.00× is desktop-matched: one pixel of mouse movement moves the point under the crosshair one pixel
+on screen, so it feels like the desktop cursor and stays consistent when you change FOV or resize.
+By default the OS pointer speed and acceleration apply; "Raw mouse input" bypasses both.
 
 ## Stack
 

@@ -4,15 +4,19 @@ import { DEFAULT_MODE, MODES, newRolls } from '../../game/modes';
 import { createInitialState, gameReducer, PHASES } from '../../game/state';
 import { resetStreak, unlockAudio } from '../../sound';
 import { readStored, writeStored } from '../../storage';
+import { DEFAULT_THEME, THEMES } from '../../themes';
 
 export const DEFAULT_SETTINGS = {
   sensitivity: 1,
   fov: 75,
-  volume: 0.6
+  volume: 0.6,
+  theme: DEFAULT_THEME,
+  effects: true,
+  rawInput: false
 };
 
 export const SETTING_LIMITS = {
-  sensitivity: { min: 0.1, max: 3, step: 0.05 },
+  sensitivity: { min: 0.05, max: 3, step: 0.05 },
   fov: { min: 40, max: 100, step: 1 },
   volume: { min: 0, max: 1, step: 0.05 }
 };
@@ -43,15 +47,25 @@ const loadProgress = () => ({
   bestRuns: readStored('bestRuns', isBestRuns, {})
 });
 
-// 'mouseSpeed' replaces the old 'sensitivity' key, whose -6..6 scale no longer applies.
+// 'lookSensitivity' replaces 'mouseSpeed' (and the older 'sensitivity'): 1 now means desktop-matched,
+// so values saved on the old scales would feel wildly off.
 const loadSettings = () => ({
-  sensitivity: readStored('mouseSpeed', inRange('sensitivity'), DEFAULT_SETTINGS.sensitivity),
+  sensitivity: readStored('lookSensitivity', inRange('sensitivity'), DEFAULT_SETTINGS.sensitivity),
   fov: readStored('fov', inRange('fov'), DEFAULT_SETTINGS.fov),
-  volume: readStored('volume', inRange('volume'), DEFAULT_SETTINGS.volume)
+  volume: readStored('volume', inRange('volume'), DEFAULT_SETTINGS.volume),
+  theme: readStored('theme', value => Boolean(THEMES[value]), DEFAULT_SETTINGS.theme),
+  effects: readStored('effects', value => typeof value === 'boolean', DEFAULT_SETTINGS.effects),
+  rawInput: readStored('rawInput', value => typeof value === 'boolean', DEFAULT_SETTINGS.rawInput)
 });
 
-// Chrome rejects raw (unadjusted) input on some platforms; fall back to OS-accelerated input there.
-async function requestPointerLock(element) {
+// By default the browser applies the OS pointer speed and acceleration, so 1× feels like the desktop.
+// Raw input skips both (what competitive players usually want); Chrome rejects it on some platforms,
+// so fall back to OS-adjusted input there.
+async function requestPointerLock(element, rawInput) {
+  if (!rawInput) {
+    await element.requestPointerLock();
+    return;
+  }
   try {
     await element.requestPointerLock({ unadjustedMovement: true });
   } catch (error) {
@@ -81,9 +95,12 @@ export function GameContextProvider({ children }) {
   }, [bestRuns]);
 
   useEffect(() => {
-    writeStored('mouseSpeed', settings.sensitivity);
+    writeStored('lookSensitivity', settings.sensitivity);
+    writeStored('rawInput', settings.rawInput);
     writeStored('fov', settings.fov);
     writeStored('volume', settings.volume);
+    writeStored('theme', settings.theme);
+    writeStored('effects', settings.effects);
   }, [settings]);
 
   useEffect(() => {
@@ -91,6 +108,14 @@ export function GameContextProvider({ children }) {
     const timer = setInterval(() => dispatch({ type: 'tick' }), 1000);
     return () => clearInterval(timer);
   }, [phase]);
+
+  // Skeet keeps throwing discs on a fixed rhythm; the reducer caps how many are in the air.
+  const { launchEveryMs } = MODES[mode];
+  useEffect(() => {
+    if (phase !== PHASES.RUNNING || !launchEveryMs) return undefined;
+    const launcher = setInterval(() => dispatch({ type: 'launch', rolls: newRolls() }), launchEveryMs);
+    return () => clearInterval(launcher);
+  }, [phase, launchEveryMs]);
 
   useEffect(() => {
     if (phase === PHASES.FINISHED && document.pointerLockElement) {
@@ -133,11 +158,11 @@ export function GameContextProvider({ children }) {
     unlockAudio();
     setLockError(null);
     try {
-      await requestPointerLock(element);
+      await requestPointerLock(element, settings.rawInput);
     } catch {
       setLockError(LOCK_ERROR);
     }
-  }, []);
+  }, [settings.rawInput]);
 
   const startRun = useCallback(() => {
     setLockError(null);
@@ -153,6 +178,19 @@ export function GameContextProvider({ children }) {
   }, [game.mode]);
 
   const endRun = useCallback(() => dispatch({ type: 'finish' }), []);
+
+  // Camera view: 'menu' → 'entering' while the camera glides in (the menu is gone but the run hasn't
+  // started) → 'game' once it arrives; back to 'menu' the moment the pointer unlocks.
+  const [view, setView] = useState('menu');
+  const beginEntering = useCallback(() => setView('entering'), []);
+  const enterGame = useCallback(() => {
+    setView('game');
+    startRun();
+  }, [startRun]);
+  const leaveGame = useCallback(() => {
+    setView('menu');
+    endRun();
+  }, [endRun]);
   const shoot = useCallback(targetKey => dispatch({ type: 'shot', targetKey, rolls: newRolls() }), []);
   const expire = useCallback(targetKey => dispatch({ type: 'expire', targetKey, rolls: newRolls() }), []);
   const selectMode = useCallback(nextMode => dispatch({ type: 'selectMode', mode: nextMode, rolls: newRolls() }), []);
@@ -169,8 +207,10 @@ export function GameContextProvider({ children }) {
     lockError,
     controlsRef,
     requestStart,
-    startRun,
-    endRun,
+    view,
+    beginEntering,
+    enterGame,
+    leaveGame,
     shoot,
     expire,
     selectMode,

@@ -56,6 +56,32 @@
   font-variant-numeric: tabular-nums;
 }
 
+.lives {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 72px;
+}
+
+.pips {
+  display: flex;
+  gap: 8px;
+}
+
+.pip {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  opacity: 0.35;
+}
+
+.pipOn {
+  background: var(--accent);
+  opacity: 1;
+}
+
 .timerLow {
   color: var(--danger);
   animation: pulse 1s ease-in-out infinite;
@@ -88,5 +114,7 @@
   transform: translateX(-50%);
   font-size: 12px;
   letter-spacing: 0.08em;
-  color: var(--muted);
+  color: var(--text);
+  opacity: 0.75;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }

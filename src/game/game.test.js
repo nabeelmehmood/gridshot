@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { calculateAccuracy, calculateScore, formatAccuracy, GAME_DURATION } from './scoring';
-import { MODES, ROLL_COUNT, respawnTarget, spawnTargets, strafePosition } from './modes';
+import { MODES, ROLL_COUNT, respawnTarget, skeetPosition, spawnTargets, strafePosition } from './modes';
 import { pickFreeSlot, pickTargets, TARGET_SLOTS } from './targets';
 import { bestRunOf, createInitialState, gameReducer, PHASES } from './state';
 
@@ -111,6 +111,83 @@ describe('game lifecycle', () => {
     expect(play(state, { type: 'expire', targetKey: target.key, rolls: rolls(0.1) })).toBe(state);
   });
 
+  it('launches skeet discs up to the limit, removes hit discs and counts escapes', () => {
+    let state = play(createInitialState({ mode: 'skeet' }), start());
+    expect(state.targets).toHaveLength(1);
+    const [disc] = state.targets;
+    expect(disc.lifetimeMs).toBeGreaterThan(1000);
+    expect(Math.abs(disc.vx)).toBeGreaterThan(0);
+
+    state = play(state, { type: 'launch', rolls: rolls(0.2) }, { type: 'launch', rolls: rolls(0.7) });
+    expect(state.targets).toHaveLength(MODES.skeet.maxActive);
+
+    state = play(state, shot(disc.key));
+    expect(state).toMatchObject({ hits: 1, clicks: 1 });
+    expect(state.targets.map(t => t.key)).not.toContain(disc.key);
+
+    const [other] = state.targets;
+    state = play(state, { type: 'expire', targetKey: other.key, rolls: rolls(0.5) });
+    expect(state).toMatchObject({ expired: 1, targets: [] });
+  });
+
+  it('keeps a skeet disc inside the arc until it escapes', () => {
+    for (const roll of [0, 0.5, 0.999]) {
+      const [disc] = spawnTargets('skeet', 0, rolls(roll));
+      const [, y] = skeetPosition(disc, disc.lifetimeMs / 1000 / 2);
+      expect(y).toBeGreaterThan(1);
+      expect(y).toBeLessThan(9.5);
+    }
+  });
+
+  it('alternates spidershot targets between the centre and away from it', () => {
+    let state = play(createInitialState({ mode: 'spidershot' }), start());
+    expect(state.targets[0]).toMatchObject({ x: 0, y: 4, center: true });
+    state = play(state, shot(state.targets[0].key));
+    const away = state.targets[0];
+    expect(away.center).toBeUndefined();
+    expect(Math.hypot(away.x, away.y - 4)).toBeGreaterThan(1.5);
+    state = play(state, shot(away.key));
+    expect(state.targets[0]).toMatchObject({ x: 0, y: 4, center: true });
+  });
+
+  it('keeps microshot targets near the crosshair and moving', () => {
+    let state = play(createInitialState({ mode: 'microshot' }), start());
+    for (let i = 0; i < 20; i++) {
+      const [target] = state.targets;
+      expect(Math.abs(target.x)).toBeLessThanOrEqual(2.5);
+      expect(target.y).toBeGreaterThanOrEqual(2.5);
+      expect(target.y).toBeLessThanOrEqual(5.5);
+      state = play(state, { type: 'shot', targetKey: target.key, rolls: rolls((i * 0.37) % 1) });
+      expect(Math.hypot(state.targets[0].x - target.x, state.targets[0].y - target.y)).toBeGreaterThan(0.3);
+    }
+  });
+
+  it('keeps three bouncing balls in play', () => {
+    let state = play(createInitialState({ mode: 'bounce' }), start());
+    expect(state.targets).toHaveLength(3);
+    state = play(state, shot(state.targets[1].key));
+    expect(state.targets).toHaveLength(3);
+    expect(state.hits).toBe(1);
+  });
+
+  it('runs survival without a clock until three targets expire', () => {
+    let state = play(createInitialState({ mode: 'survival' }), start(4));
+    expect(state).toMatchObject({ lives: 3 });
+    state = play(state, ...ticks(GAME_DURATION + 30));
+    expect(state).toMatchObject({ phase: PHASES.RUNNING, elapsed: GAME_DURATION + 30 });
+
+    // Targets get shorter-lived and more numerous as hits pile up.
+    const firstLifetime = state.targets[0].lifetimeMs;
+    for (let i = 0; i < 16; i++) state = play(state, shot(state.targets[0].key));
+    expect(state.targets.length).toBe(3);
+    expect(Math.max(...state.targets.map(t => t.lifetimeMs))).toBeLessThan(firstLifetime);
+
+    for (let life = 3; life > 0; life--) {
+      state = play(state, { type: 'expire', targetKey: state.targets[0].key, rolls: rolls(0.4) });
+    }
+    expect(state).toMatchObject({ phase: PHASES.FINISHED, lives: 0, expired: 3, completed: true, newBest: true });
+  });
+
   it('keeps bests per mode and only switches mode between runs', () => {
     let state = play(createInitialState(), start(), ...ticks(GAME_DURATION));
     state = play(state, { type: 'selectMode', mode: 'strafe', rolls: rolls(0.5) });
@@ -120,6 +197,6 @@ describe('game lifecycle', () => {
     const running = play(state, start());
     expect(play(running, { type: 'selectMode', mode: 'gridshot', rolls: rolls(0.5) })).toBe(running);
     expect(play(state, { type: 'selectMode', mode: 'nope', rolls: rolls(0.5) })).toBe(state);
-    expect(Object.keys(MODES)).toEqual(['gridshot', 'strafe', 'popin']);
+    expect(Object.keys(MODES)).toEqual(['gridshot', 'strafe', 'popin', 'skeet', 'spidershot', 'microshot', 'bounce', 'survival']);
   });
 });

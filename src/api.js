@@ -1,15 +1,20 @@
+import { MODES } from './game/modes';
 import { MAX_SCORE } from './game/scoring';
 
 const API_BASE = 'https://us-central1-gridshot-bbd16.cloudfunctions.net';
 
-const isValidEntry = user =>
-  typeof user?.username === 'string' && Number.isInteger(user.score) && user.score > 0 && user.score <= MAX_SCORE;
+// Timed runs have a hard score ceiling; Survival runs are open-ended, so only the server limits them.
+const isValidEntry = (user, mode) =>
+  typeof user?.username === 'string' &&
+  Number.isInteger(user.score) &&
+  user.score > 0 &&
+  (MODES[mode]?.untimed || user.score <= MAX_SCORE);
 
 export async function fetchTopScores(mode) {
   const res = await fetch(`${API_BASE}/getTopScores?mode=${encodeURIComponent(mode)}`);
   if (!res.ok) throw new Error(`Leaderboard request failed (${res.status})`);
   const data = await res.json();
-  return Array.isArray(data.users) ? data.users.filter(isValidEntry) : [];
+  return Array.isArray(data.users) ? data.users.filter(user => isValidEntry(user, mode)) : [];
 }
 
 // Server-issued token for the run that is starting; required to submit its score.

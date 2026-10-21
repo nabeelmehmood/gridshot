@@ -52,6 +52,13 @@ button:disabled {
   opacity: 0.6;
 }
 
+.vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.35) 100%);
+}
+
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;

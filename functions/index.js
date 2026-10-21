@@ -21,19 +21,37 @@ const RUNS = 'Runs';
 // Must match src/game/username.js.
 const USERNAME_PATTERN = /^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$/;
 
-// Must match src/game/modes.js and src/game/scoring.js.
-const MODES = ['gridshot', 'strafe', 'popin'];
+// Must match MODES in src/game/modes.js.
+//   maxExpired  expired targets one run can report (Pop-in lives 1.1s; Skeet throws one per 1.2s)
+//   untimed     no 60s clock (Survival): limits scale with how long the run actually lasted
+const MODE_RULES = {
+  gridshot: { maxExpired: 0 },
+  strafe: { maxExpired: 0 },
+  popin: { maxExpired: 60 },
+  skeet: { maxExpired: 60 },
+  spidershot: { maxExpired: 0 },
+  microshot: { maxExpired: 0 },
+  bounce: { maxExpired: 0 },
+  survival: { maxExpired: 3, untimed: true }
+};
+const MODES = Object.keys(MODE_RULES);
 const DEFAULT_MODE = 'gridshot';
+// Must match src/game/scoring.js.
 const POINTS = { HIT: 10, MISS: -5, EXPIRED: -5 };
-// Pop-in targets live 1.1s, so a 60s run can't expire more than ~55.
-const MAX_EXPIRED = 60;
+
+// Timed runs: 4 hits/s for a whole minute is beyond any human; ~3/s is world-class.
 const RUN_DURATION_MS = 60 * 1000;
-// 4 hits/s for a whole minute is beyond any human; ~3/s is world-class.
 const MAX_HITS = 240;
 const MAX_CLICKS = 1000;
+// Untimed runs: the same rates against the run's real length, with a hard ceiling (~40 minutes of play).
+const MAX_HITS_PER_SECOND = 4;
+const MAX_CLICKS_PER_SECOND = 15;
+const MAX_UNTIMED_HITS = 3000;
+const MAX_UNTIMED_CLICKS = 15000;
+const MIN_UNTIMED_RUN_MS = 5000;
 
-// A run can't be submitted before its timer could have run out (minus timer/network slack),
-// and its token expires after a week.
+// A timed run can't be submitted before its timer could have run out (minus timer/network slack),
+// and every token expires after a week.
 const MIN_RUN_MS = RUN_DURATION_MS - 3000;
 const RUN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -102,11 +120,10 @@ exports.addScore = runtime.https.onRequest((req, res) =>
       !Number.isInteger(clicks) ||
       !Number.isInteger(expired) ||
       expired < 0 ||
-      expired > MAX_EXPIRED ||
       hits < 0 ||
       hits > clicks ||
-      hits > MAX_HITS ||
-      clicks > MAX_CLICKS
+      hits > MAX_UNTIMED_HITS ||
+      clicks > MAX_UNTIMED_CLICKS
     ) {
       return fail(res, 400, 'Invalid run.');
     }
@@ -121,15 +138,25 @@ exports.addScore = runtime.https.onRequest((req, res) =>
         const run = await tx.get(runRef);
         if (!run.exists || run.get('usedAt')) throw new RejectedRun('This run was already submitted or is unknown.');
 
-        const startedAt = run.get('startedAt');
-        const elapsed = Date.now() - (startedAt ? startedAt.toMillis() : Date.now());
-        if (elapsed < MIN_RUN_MS) throw new RejectedRun('Run finished too quickly.');
-        if (elapsed > RUN_TTL_MS) throw new RejectedRun('This run is too old to submit.');
-
         // The mode comes from the token, not the request, so scores can't be filed under another mode.
         const mode = run.get('mode');
-        if (!MODES.includes(mode)) throw new RejectedRun('Unknown mode.');
-        if (mode !== 'popin' && expired !== 0) throw new RejectedRun('Invalid run.');
+        const rules = MODE_RULES[mode];
+        if (!rules) throw new RejectedRun('Unknown mode.');
+        if (expired > rules.maxExpired) throw new RejectedRun('Invalid run.');
+
+        const startedAt = run.get('startedAt');
+        const elapsed = Date.now() - (startedAt ? startedAt.toMillis() : Date.now());
+        if (elapsed > RUN_TTL_MS) throw new RejectedRun('This run is too old to submit.');
+        if (rules.untimed) {
+          if (elapsed < MIN_UNTIMED_RUN_MS) throw new RejectedRun('Run finished too quickly.');
+          const seconds = elapsed / 1000;
+          if (hits > seconds * MAX_HITS_PER_SECOND || clicks > seconds * MAX_CLICKS_PER_SECOND) {
+            throw new RejectedRun('Invalid run.');
+          }
+        } else {
+          if (elapsed < MIN_RUN_MS) throw new RejectedRun('Run finished too quickly.');
+          if (hits > MAX_HITS || clicks > MAX_CLICKS) throw new RejectedRun('Invalid run.');
+        }
 
         tx.update(runRef, { usedAt: FieldValue.serverTimestamp() });
         tx.create(db.collection(SCORES).doc(), {
