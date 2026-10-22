@@ -49,4 +49,6 @@ export async function submitScore(username, { runId, hits, clicks, expired, bonu
   if (!res.ok || !data.success) {
     throw new Error(data.result || 'Could not save your score. Please try again.');
   }
+  // The server says what changed, e.g. "Saved 1794 to this week's board. Your all-time best of 1904 still stands."
+  return data.result;
 }

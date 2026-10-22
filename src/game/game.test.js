@@ -396,3 +396,21 @@ describe('run registration', () => {
     expect(state.runIssue).toBeNull();
   });
 });
+
+describe('saving runs', () => {
+  it('saves any finished run and keeps the reply, without marking a different best as saved', () => {
+    const hitFirst = state => shot(state.targets[0].key);
+    let state = play(createInitialState(), start(1), { type: 'runRegistered', runKey: 1, runId: 'best' });
+    for (let i = 0; i < 5; i++) state = play(state, hitFirst(state));
+    state = play(state, ...ticks(GAME_DURATION));
+    state = play(state, start(2), { type: 'runRegistered', runKey: 2, runId: 'lower' }, hitFirst(state), ...ticks(GAME_DURATION));
+    expect(state).toMatchObject({ runId: 'lower', newBest: false, runSaved: null });
+
+    state = play(state, { type: 'scoreSaved', mode: 'gridshot', message: "Saved 10 to this week's board." });
+    expect(state.runSaved).toBe("Saved 10 to this week's board.");
+    expect(bestRunOf(state)).toMatchObject({ runId: 'best', saved: false });
+
+    state = play(state, start(3));
+    expect(state.runSaved).toBeNull();
+  });
+});

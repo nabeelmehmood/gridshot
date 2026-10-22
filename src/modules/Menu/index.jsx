@@ -206,7 +206,10 @@ function MainCard({ onOpenLeaderboard, guide, dimmed, onStarted }) {
   const practice = settings.practice.enabled;
   const finished = game.phase === PHASES.FINISHED;
   const bestRun = bestRunOf(game);
-  const canSave = finished && bestRun?.runId && !bestRun.saved && bestRun.score > 0;
+  // Any finished, ranked run can go on the boards; the server keeps each player's best.
+  const runScore = calculateScore(game.hits, game.clicks, game.expired, game.bonus);
+  const ranked = finished && game.completed && !game.practice && runScore > 0;
+  const canSave = ranked && game.runId && !game.runSaved;
   const topScorer = leaderboardFor(game.mode).users[0];
   const mode = MODES[game.mode];
   const startStep = guide?.step === 'start';
@@ -265,7 +268,7 @@ function MainCard({ onOpenLeaderboard, guide, dimmed, onStarted }) {
       {finished && !game.completed && (
         <p className={styles.info}>Run ended early. Only finished runs count toward your best.</p>
       )}
-      {finished && game.newBest && !bestRun?.runId && (
+      {ranked && game.runIssue && (
         <p className={styles.warning}>
           {game.runIssue === 'busy'
             ? 'The leaderboard was too busy to register this run when it started, so it can’t be submitted. Your next run should be fine.'
@@ -273,7 +276,7 @@ function MainCard({ onOpenLeaderboard, guide, dimmed, onStarted }) {
         </p>
       )}
       {canSave && <SaveScore />}
-      {finished && game.newBest && bestRun?.saved && <p className={styles.success}>Saved to the leaderboard.</p>}
+      {game.runSaved && finished && <p className={styles.success}>{game.runSaved}</p>}
 
       {lockError && (
         <p role="alert" className={styles.warning}>

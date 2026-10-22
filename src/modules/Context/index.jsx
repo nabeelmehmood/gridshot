@@ -345,7 +345,10 @@ export function GameContextProvider({ children }) {
     track('mode_select', { mode: nextMode });
     dispatch({ type: 'selectMode', mode: nextMode, rolls: newRolls() });
   }, []);
-  const markScoreSaved = useCallback(savedMode => dispatch({ type: 'scoreSaved', mode: savedMode }), []);
+  const markScoreSaved = useCallback(
+    (savedMode, message) => dispatch({ type: 'scoreSaved', mode: savedMode, message }),
+    []
+  );
   const reportLockError = useCallback(() => setLockError(LOCK_ERROR), []);
 
   const value = {

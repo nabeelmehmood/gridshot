@@ -55,6 +55,8 @@ export function createInitialState({ mode = DEFAULT_MODE, bestRuns = {}, history
     runId: null,
     // Why the current run has no token: 'busy' (rate limited) or 'offline'; null otherwise.
     runIssue: null,
+    // The server's reply once this run has been saved; null until then.
+    runSaved: null,
     completed: false,
     newBest: false,
     bestRuns,
@@ -179,6 +181,7 @@ export function gameReducer(state, action) {
           runKey: action.runKey,
           runId: null,
           runIssue: null,
+          runSaved: null,
           completed: false,
           newBest: false
         },
@@ -234,10 +237,15 @@ export function gameReducer(state, action) {
     }
     case 'finish':
       return state.phase === PHASES.RUNNING ? finishRun(state, false) : state;
+    // Any finished run can be saved; the server keeps each player's best per board.
     case 'scoreSaved': {
       const best = state.bestRuns[action.mode];
-      if (!best) return state;
-      return { ...state, bestRuns: { ...state.bestRuns, [action.mode]: { ...best, saved: true } } };
+      const savedBest = best && best.runId === state.runId;
+      return {
+        ...state,
+        runSaved: action.message ?? 'Saved to the leaderboard.',
+        bestRuns: savedBest ? { ...state.bestRuns, [action.mode]: { ...best, saved: true } } : state.bestRuns
+      };
     }
     default:
       return state;
