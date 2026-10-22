@@ -1,5 +1,8 @@
 import { formatAccuracy } from '../../game/scoring';
 import { MODES } from '../../game/modes';
+import { describePattern } from '../../game/missMap';
+import { rankFor } from '../../game/ranks';
+import RankBadge from '../Rank';
 import { useGame } from '../Context';
 import styles from './index.module.css';
 
@@ -28,6 +31,9 @@ export default function StatsPanel({ mode }) {
 
   return (
     <div className={styles.stats}>
+      <p className={styles.rankLine}>
+        Your rank <RankBadge rank={rankFor(mode, best)} showNext />
+      </p>
       <dl className={styles.tiles}>
         <Tile label="Best" value={best} />
         <Tile label="Average" value={Math.round(average(recent.map(run => run.score)))} />
@@ -36,10 +42,26 @@ export default function StatsPanel({ mode }) {
         <Tile label="Best streak" value={Math.max(0, ...runs.map(run => run.bestStreak ?? 0))} />
         <Tile label="Runs" value={history.count} />
       </dl>
+      <UsualMiss runs={recent} />
       <ScoreChart scores={runs.map(run => run.score)} best={best} />
       <Trend scores={runs.map(run => run.score)} />
       <p className={styles.note}>Average, accuracy and time per hit cover your last {recent.length} runs. Stats stay in this browser.</p>
     </div>
+  );
+}
+
+// The miss pattern that shows up most across recent runs, when it's a real habit (3+ runs).
+function UsualMiss({ runs }) {
+  const counts = new Map();
+  for (const { missPattern } of runs) {
+    if (missPattern && !['none', 'few', 'even'].includes(missPattern)) counts.set(missPattern, (counts.get(missPattern) ?? 0) + 1);
+  }
+  const [pattern, times] = [...counts].sort((a, b) => b[1] - a[1])[0] ?? [];
+  if (!pattern || times < 3) return null;
+  return (
+    <p className={styles.usualMiss}>
+      Usual miss: <strong>{describePattern(pattern)}</strong> ({times} of your last {runs.length} runs)
+    </p>
   );
 }
 

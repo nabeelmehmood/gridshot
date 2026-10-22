@@ -3,6 +3,8 @@ import { track } from '../../analytics';
 import { fetchTopScores, registerRun } from '../../api';
 import { DEFAULT_MODE, MODES, newRolls } from '../../game/modes';
 import { DEFAULT_PRACTICE, isPracticeSettings, practiceRun } from '../../game/practice';
+import { isGameSens } from '../../game/sensitivity';
+import { rankFor } from '../../game/ranks';
 import { calculateAccuracy, calculateScore } from '../../game/scoring';
 import { avgHitMs, createInitialState, gameReducer, PHASES } from '../../game/state';
 import { playCountdown, resetStreak, unlockAudio } from '../../sound';
@@ -15,6 +17,8 @@ const prefersReducedMotion =
 
 export const DEFAULT_SETTINGS = {
   sensitivity: 1,
+  // null, or { game, value, dpi } to turn exactly like another game (see game/sensitivity.js).
+  gameSens: null,
   fov: 75,
   // volume is the hit sound (and countdown); misses have their own level. M toggles muted.
   volume: 0.6,
@@ -91,8 +95,14 @@ const COUNTDOWN_STEP_MS = 600;
 
 // New key on purpose: bests from before run tokens ('topScore') can't be submitted, so they
 // start over together with the leaderboard.
+// A link like /gridshot/?mode=skeet (from the mode pages) opens on that mode.
+const linkedMode = () => {
+  const mode = new URLSearchParams(window.location.search).get('mode');
+  return MODES[mode] ? mode : null;
+};
+
 const loadProgress = () => ({
-  mode: readStored('mode', value => Boolean(MODES[value]), DEFAULT_MODE),
+  mode: linkedMode() ?? readStored('mode', value => Boolean(MODES[value]), DEFAULT_MODE),
   bestRuns: readStored('bestRuns', isBestRuns, {}),
   history: readStored('runHistory', isHistory, {})
 });
@@ -101,6 +111,7 @@ const loadProgress = () => ({
 // so values saved on the old scales would feel wildly off.
 const loadSettings = () => ({
   sensitivity: readStored('lookSensitivity', inRange('sensitivity'), DEFAULT_SETTINGS.sensitivity),
+  gameSens: readStored('gameSens', isGameSens, DEFAULT_SETTINGS.gameSens),
   fov: readStored('fov', inRange('fov'), DEFAULT_SETTINGS.fov),
   volume: readStored('volume', inRange('volume'), DEFAULT_SETTINGS.volume),
   missVolume: readStored('missVolume', inRange('volume'), DEFAULT_SETTINGS.missVolume),
@@ -150,9 +161,11 @@ export function GameContextProvider({ children }) {
   useEffect(() => {
     if (phase !== PHASES.FINISHED) return;
     if (completed) {
+      const score = calculateScore(hits, clicks, expired, bonus);
       track('run_complete', {
         mode,
-        score: calculateScore(hits, clicks, expired, bonus),
+        score,
+        rank: practice ? null : (rankFor(mode, score)?.id ?? null),
         accuracy: Math.round((calculateAccuracy(hits, clicks) ?? 0) * 10) / 10,
         best_streak: bestStreak,
         avg_hit_ms: hitMs === null ? null : Math.round(hitMs),
@@ -179,6 +192,7 @@ export function GameContextProvider({ children }) {
   useEffect(() => {
     writeStored('lookSensitivity', settings.sensitivity);
     writeStored('rawInput', settings.rawInput);
+    writeStored('gameSens', settings.gameSens);
     writeStored('fov', settings.fov);
     writeStored('volume', settings.volume);
     writeStored('missVolume', settings.missVolume);
@@ -323,7 +337,7 @@ export function GameContextProvider({ children }) {
     return () => clearTimeout(timer);
   }, [countdown, hitVolume, startRun]);
   const shoot = useCallback(
-    targetKey => dispatch({ type: 'shot', targetKey, rolls: newRolls(), at: performance.now() }),
+    (targetKey, miss) => dispatch({ type: 'shot', targetKey, rolls: newRolls(), at: performance.now(), miss }),
     []
   );
   const expire = useCallback(targetKey => dispatch({ type: 'expire', targetKey, rolls: newRolls() }), []);

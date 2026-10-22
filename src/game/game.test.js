@@ -11,6 +11,9 @@ import { MODES, ROLL_COUNT, respawnTarget, skeetPosition, spawnTargets, strafePo
 import { pickFreeSlot, pickTargets, TARGET_SLOTS } from './targets';
 import { avgHitMs, bestRunOf, createInitialState, gameReducer, HISTORY_SIZE, paceVsBest, PHASES } from './state';
 import { USERNAME_PATTERN } from './username';
+import { RANK_THRESHOLDS, rankFor } from './ranks';
+import { summarizeMisses } from './missMap';
+import { cmPer360, degreesPerCount, isGameSens } from './sensitivity';
 
 const rolls = value => Array.from({ length: ROLL_COUNT }, () => value);
 const play = (state, ...actions) => actions.reduce(gameReducer, state);
@@ -330,5 +333,56 @@ describe('practice runs and hit timing', () => {
     expect(state).toMatchObject({ phase: PHASES.FINISHED, completed: true, newBest: false });
     expect(state.bestRuns).toBe(bestRuns);
     expect(state.history).toBe(history);
+  });
+});
+
+describe('ranks', () => {
+  it('maps scores to tiers per mode, with the distance to the next one', () => {
+    expect(rankFor('gridshot', 0)).toBeNull();
+    expect(rankFor('gridshot', 1)).toMatchObject({ id: 'bronze', next: { toGo: 599, tier: { id: 'silver' } } });
+    expect(rankFor('gridshot', 1100)).toMatchObject({ id: 'gold', level: 2, next: { at: 1600 } });
+    expect(rankFor('gridshot', 5000)).toMatchObject({ id: 'diamond', next: null });
+    expect(Object.keys(RANK_THRESHOLDS)).toEqual(Object.keys(MODES));
+    for (const thresholds of Object.values(RANK_THRESHOLDS)) {
+      expect([...thresholds].sort((a, b) => a - b)).toEqual(thresholds);
+    }
+  });
+});
+
+describe('miss map', () => {
+  const misses = (dx, dy, along, n = 6) => Array.from({ length: n }, () => ({ dx, dy, along }));
+
+  it('names the lean and suggests a fix', () => {
+    expect(summarizeMisses(misses(0.6, 0, 0.8))).toMatchObject({
+      key: 'overshoot,right',
+      headline: 'Your misses tend to overshoot and land right.'
+    });
+    expect(summarizeMisses(misses(0, -0.5, -0.6)).key).toBe('undershoot,low');
+    expect(summarizeMisses(misses(0.1, -0.1, 0.1)).key).toBe('even');
+  });
+
+  it('needs a few misses before calling a pattern', () => {
+    expect(summarizeMisses([]).key).toBe('none');
+    expect(summarizeMisses([], 3).headline).toMatch(/nowhere near/);
+    expect(summarizeMisses(misses(1, 1, 1, 3)).key).toBe('few');
+  });
+
+  it('records misses on the run and keeps the pattern in history', () => {
+    let state = play(createInitialState(), start());
+    for (let i = 0; i < 6; i++) state = play(state, { type: 'shot', targetKey: null, rolls: rolls(0.6), miss: { dx: 0.7, dy: 0, along: 0.9 } });
+    state = play(state, { type: 'shot', targetKey: null, rolls: rolls(0.6), miss: { wild: true } }, ...ticks(GAME_DURATION));
+    expect(state).toMatchObject({ wildMisses: 1 });
+    expect(state.misses).toHaveLength(6);
+    expect(state.history.gridshot.runs.at(-1).missPattern).toBe('overshoot,right');
+  });
+});
+
+describe('sensitivity matching', () => {
+  it('copies the game turn rate and reports cm/360', () => {
+    expect(degreesPerCount({ game: 'valorant', value: 0.4 })).toBeCloseTo(0.028);
+    expect(cmPer360(degreesPerCount({ game: 'cs2', value: 1 }), 800)).toBeCloseTo(51.95, 1);
+    expect(isGameSens({ game: 'valorant', value: 0.4, dpi: 800 })).toBe(true);
+    expect(isGameSens({ game: 'fortnite', value: 0.4, dpi: 800 })).toBe(false);
+    expect(isGameSens(null)).toBe(true);
   });
 });

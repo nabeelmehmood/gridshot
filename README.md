@@ -207,6 +207,37 @@ there is harmless. `FAILED` lines show Firebase's error, usually a login problem
 The script is `scripts/remove-score.mjs`. It reads the mode list from `functions/index.js`, so a
 new mode is picked up automatically.
 
+## Ranks
+
+Bronze to Diamond per mode, from the thresholds in `src/game/ranks.js`. They're first estimates;
+once the leaderboards fill up, tune them so Silver is roughly the top 70% of scores, Gold the top
+40%, Platinum the top 15% and Diamond the top 3%. The mode pages pick up the new numbers on the next
+build.
+
+## Mode pages (search)
+
+`npm run pages` writes a page per mode to `public/modes/<mode>/` and rebuilds `public/sitemap.xml`;
+it also runs automatically before every build. Each page links to `/gridshot/?mode=<mode>`, which
+opens the game on that mode. The per-mode text lives in `scripts/generate-mode-pages.mjs`, and the
+script refuses to run until a new mode has its own copy there.
+
+## Monthly check
+
+Five minutes, once a month, so a surprise never gets as far as the $5 kill switch.
+
+| Where | Look at | Normal | Act if |
+|---|---|---|---|
+| Firebase console → Usage and billing | This month's cost | $0.00 | anything above $0: find which product in the breakdown |
+| Google Cloud console → Billing → Budgets & alerts | The $5 budget | Under 20% spent | It's climbing: check Functions below for a flood |
+| Firebase console → Functions → Usage | Invocations per day | A few per visit: a leaderboard load on arrival and per board opened, a run start per run, a save now and then | Sudden spikes with no matching visits in Umami: someone is scripting the API; the rate limits cap it, but consider App Check |
+| Firebase console → Firestore → Usage | Reads and writes per day | Far under the free 50K reads / 20K writes | Close to the limit: raise `LEADERBOARD_CACHE_MS` in `functions/index.js` |
+| Firestore → Data → `LeaderboardScores` | The top of each mode | Believable scores | Junk names or impossible scores: `npm run remove-score -- <name>` |
+| Umami → Gridshot → Events | Events this month | Well under 100K (the free plan's limit) | Near the limit: drop the noisiest events (`mode_select`, `theme_select`) |
+
+The `Runs` collection grows by one small document per run. It's harmless, but if it ever reaches the
+tens of thousands, clear it the same way as after a scoring change (see Removing a leaderboard
+entry). Only unsubmitted runs from the last week matter.
+
 ## Analytics
 
 Visits and a handful of game events (runs started, finished and abandoned, saves, shares) go to

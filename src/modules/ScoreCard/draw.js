@@ -62,7 +62,7 @@ function badge(ctx, label, x, y, background, color) {
   ctx.fillText(label, x + 18, y + 31);
 }
 
-export async function renderScoreCard({ score, modeName, accuracy, bestStreak, hits, newBest, theme }) {
+export async function renderScoreCard({ score, modeName, accuracy, bestStreak, hits, newBest, rank, theme }) {
   try {
     await document.fonts.load(`700 64px ${DISPLAY}`);
   } catch {
@@ -102,6 +102,10 @@ export async function renderScoreCard({ score, modeName, accuracy, bestStreak, h
   text(ctx, modeName.toUpperCase(), 80, 168, { size: 36, color: accent, spacing: 4 });
   text(ctx, String(score), 70, 372, { size: 210 });
   if (newBest) badge(ctx, 'NEW PERSONAL BEST', 84, 398, accent, accentText);
+  if (rank) {
+    const x = newBest ? 84 + ctx.measureText('NEW PERSONAL BEST').width + 60 : 84;
+    text(ctx, `${rank.name.toUpperCase()} RANK`, x, 431, { size: 30, color: rank.color, spacing: 3 });
+  }
 
   const stats = [
     ['Accuracy', accuracy],

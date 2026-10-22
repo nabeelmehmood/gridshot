@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { track } from '../../analytics';
+import { TIERS } from '../../game/ranks';
 import { THEMES } from '../../themes';
 import { useGame } from '../Context';
 import { renderScoreCard } from './draw';
@@ -23,7 +24,7 @@ export default function ScoreCardButton({ run }) {
 function ScoreCardDialog({ run, onClose }) {
   const { settings } = useGame();
   // Fields, not the object: the results screen builds a fresh `run` on every render.
-  const { score, modeName, accuracy, bestStreak, hits, newBest } = run;
+  const { score, modeName, accuracy, bestStreak, hits, newBest, rankId } = run;
   const dialogRef = useRef(null);
   const [card, setCard] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -40,7 +41,8 @@ function ScoreCardDialog({ run, onClose }) {
   useEffect(() => {
     let url = null;
     let cancelled = false;
-    renderScoreCard({ score, modeName, accuracy, bestStreak, hits, newBest, theme: THEMES[settings.theme] }).then(blob => {
+    const rank = TIERS.find(tier => tier.id === rankId) ?? null;
+    renderScoreCard({ score, modeName, accuracy, bestStreak, hits, newBest, rank, theme: THEMES[settings.theme] }).then(blob => {
       if (cancelled || !blob) return;
       url = URL.createObjectURL(blob);
       setCard({ blob, url, file: new File([blob], fileName, { type: 'image/png' }) });
@@ -49,7 +51,7 @@ function ScoreCardDialog({ run, onClose }) {
       cancelled = true;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [score, modeName, accuracy, bestStreak, hits, newBest, settings.theme, fileName]);
+  }, [score, modeName, accuracy, bestStreak, hits, newBest, rankId, settings.theme, fileName]);
 
   const canShare = card && typeof navigator.canShare === 'function' && navigator.canShare({ files: [card.file] });
 

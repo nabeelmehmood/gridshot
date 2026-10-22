@@ -1,3 +1,4 @@
+import { MAX_MISSES, summarizeMisses } from './missMap';
 import { calculateScore, GAME_DURATION, STREAK_STEP, streakBonus } from './scoring';
 import { DEFAULT_MODE, MODES, newRolls, nextTarget, respawnTarget, spawnTargets, survivalTargetCount } from './modes';
 
@@ -14,6 +15,17 @@ const FRESH_STREAK = { streak: 0, bestStreak: 0, bonus: 0, streakBreaks: 0, lost
 // hitTime: milliseconds from the start (or the previous hit) to each hit, summed; lastHitAt is the
 // clock reading of the run start or the last hit. Shots carry `at` from performance.now().
 const FRESH_TIMING = { hitTime: 0, lastHitAt: null };
+
+// Miss map for the current run (see missMap.js): offsets of misses near a target, and a count of
+// the rest. Shots carry `miss` from the scene: { dx, dy, along } or { wild: true }.
+const FRESH_MISSES = { misses: [], wildMisses: 0 };
+
+function recordMiss(state, miss) {
+  if (!miss) return state;
+  if (miss.wild) return { ...state, wildMisses: state.wildMisses + 1 };
+  if (state.misses.length >= MAX_MISSES) return state;
+  return { ...state, misses: [...state.misses, { dx: miss.dx, dy: miss.dy, along: miss.along ?? null }] };
+}
 
 // Finished runs kept per mode for the stats view.
 export const HISTORY_SIZE = 20;
@@ -34,6 +46,7 @@ export function createInitialState({ mode = DEFAULT_MODE, bestRuns = {}, history
     expired: 0,
     ...FRESH_STREAK,
     ...FRESH_TIMING,
+    ...FRESH_MISSES,
     timeline: [],
     practice: null,
     targets: spawnTargets(mode, 0, newRolls()),
@@ -110,7 +123,18 @@ function finishRun(state, completed) {
   const avgMs = avgHitMs(state);
   const newBest = completed && score > (bestRunOf(state)?.score ?? 0);
   const past = state.history[mode] ?? { count: 0, runs: [] };
-  const run = { score, hits, clicks, expired, bonus, bestStreak, seconds: elapsed, avgHitMs: avgMs === null ? null : Math.round(avgMs) };
+  const { key: missPattern } = summarizeMisses(state.misses, state.wildMisses);
+  const run = {
+    score,
+    hits,
+    clicks,
+    expired,
+    bonus,
+    bestStreak,
+    seconds: elapsed,
+    avgHitMs: avgMs === null ? null : Math.round(avgMs),
+    missPattern
+  };
   return {
     ...state,
     phase: PHASES.FINISHED,
@@ -146,6 +170,7 @@ export function gameReducer(state, action) {
           expired: 0,
           ...FRESH_STREAK,
           ...FRESH_TIMING,
+          ...FRESH_MISSES,
           lastHitAt: typeof action.at === 'number' ? action.at : null,
           timeline: [],
           practice: action.practice ?? null,
@@ -178,7 +203,7 @@ export function gameReducer(state, action) {
       if (state.phase !== PHASES.RUNNING) return state;
       const hit = action.targetKey != null && state.targets.some(target => target.key === action.targetKey);
       const clicked = { ...state, clicks: state.clicks + 1 };
-      if (!hit) return breakStreak(clicked);
+      if (!hit) return recordMiss(breakStreak(clicked), action.miss);
       const counted = countHit(clicked, action.at);
       // Skeet discs are gone once hit; the launcher sends the next one.
       if (state.mode === 'skeet') return withoutTarget(counted, action.targetKey);

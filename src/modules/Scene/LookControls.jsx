@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Matrix4, Quaternion, Vector3 } from 'three';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
+import { degreesPerCount } from '../../game/sensitivity';
 
 // PointerLockControls turns `movement × 0.002 × pointerSpeed` into radians.
 const THREE_RADIANS_PER_UNIT = 0.002;
@@ -38,7 +39,9 @@ function menuPose(time, aspect, position, quaternion, still = false) {
 // Sensitivity 1 = desktop-matched: one pixel of mouse movement turns the view so the point under the
 // crosshair moves one pixel on screen, just as the desktop cursor would. That depends on the
 // vertical FOV and the canvas height, so the feel stays the same when either changes.
-function pointerSpeedFor(sensitivity, fov, height) {
+// A sensitivity matched to another game (gameSens) uses that game's fixed angle per count instead.
+function pointerSpeedFor(sensitivity, fov, height, gameSens) {
+  if (gameSens) return (degreesPerCount(gameSens) * Math.PI) / 180 / THREE_RADIANS_PER_UNIT;
   const radiansPerPixel = (2 * Math.tan((fov * Math.PI) / 360)) / Math.max(height, 1);
   return (sensitivity * radiansPerPixel) / THREE_RADIANS_PER_UNIT;
 }
@@ -48,6 +51,7 @@ function pointerSpeedFor(sensitivity, fov, height) {
 export default function LookControls({
   controlsRef,
   sensitivity,
+  gameSens,
   fov,
   reduceMotion,
   onEnterStart,
@@ -158,9 +162,9 @@ export default function LookControls({
   });
 
   useEffect(() => {
-    pointerSpeed.current = pointerSpeedFor(sensitivity, fov, height);
+    pointerSpeed.current = pointerSpeedFor(sensitivity, fov, height, gameSens);
     if (controlsRef.current) controlsRef.current.pointerSpeed = pointerSpeed.current;
-  }, [controlsRef, sensitivity, fov, height]);
+  }, [controlsRef, sensitivity, fov, height, gameSens]);
 
   useEffect(() => {
     const { camera } = get();

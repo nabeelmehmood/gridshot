@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Raycaster, Vector2, Vector3 } from 'three';
+import { NEAR_RADII } from '../../game/missMap';
 import { MODES } from '../../game/modes';
 import { PHASES } from '../../game/state';
 import { hideBootLoader } from '../../bootLoader';
@@ -18,6 +19,34 @@ const SCREEN_CENTER = new Vector2(0, 0);
 const MAX_MARK_DISTANCE = 40;
 const TARGET_PLANE_Z = -8;
 
+// Where a shot crosses the target plane, relative to the nearest target, for the miss map (see
+// game/missMap.js). `from` is the previous shot's point, which gives the flick direction.
+function measureMiss(point, targets, radius, from) {
+  const centre = new Vector3();
+  let nearest = null;
+  let nearestDistance = Infinity;
+  for (const target of targets.children) {
+    target.getWorldPosition(centre);
+    const distance = Math.hypot(point.x - centre.x, point.y - centre.y);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearest = centre.clone();
+    }
+  }
+  if (!nearest || nearestDistance > NEAR_RADII * radius) return { wild: true };
+  const dx = (point.x - nearest.x) / radius;
+  const dy = (point.y - nearest.y) / radius;
+  if (!from) return { dx, dy, along: null };
+  // Clicking again without moving (or barely moving) isn't a flick, so there's no over or under.
+  if (Math.hypot(point.x - from.x, point.y - from.y) < radius * 0.5) return { dx, dy, along: null };
+  const flickX = nearest.x - from.x;
+  const flickY = nearest.y - from.y;
+  const flick = Math.hypot(flickX, flickY);
+  // Too short a flick to say which way the player was moving.
+  if (flick < radius * 1.5) return { dx, dy, along: null };
+  return { dx, dy, along: (dx * flickX + dy * flickY) / flick };
+}
+
 // Shots are raycast from the crosshair on mousedown, which is how aim trainers register clicks.
 // The sound plays here rather than after the state update so it lands on the same frame as the click.
 function Shooter({ targetsRef, environmentRef, effectsRef, onShot, volume, missVolume, theme, hitColor, radius, effects, running }) {
@@ -28,6 +57,9 @@ function Shooter({ targetsRef, environmentRef, effectsRef, onShot, volume, missV
     const raycaster = new Raycaster();
     const worldPosition = new Vector3();
     const normal = new Vector3();
+    const aim = new Vector3();
+    // Previous shot on the target plane; reset whenever a run starts or ends.
+    let lastAim = null;
 
     const showMiss = () => {
       const [surface] = raycaster
@@ -52,6 +84,10 @@ function Shooter({ targetsRef, environmentRef, effectsRef, onShot, volume, missV
         .intersectObjects(targetsRef.current.children, true)
         .find(intersection => intersection.object.userData.targetKey !== undefined);
       playShot(Boolean(hit), volume, missVolume);
+      const t = (TARGET_PLANE_Z - raycaster.ray.origin.z) / raycaster.ray.direction.z;
+      const onPlane = t > 0 ? raycaster.ray.at(t, aim) : null;
+      const miss = !hit && onPlane ? measureMiss(onPlane, targetsRef.current, radius, lastAim) : null;
+      lastAim = onPlane ? onPlane.clone() : null;
       if (effects && effectsRef.current) {
         if (hit) {
           effectsRef.current.hit(hit.object.getWorldPosition(worldPosition), hitColor, radius, camera.position);
@@ -59,7 +95,7 @@ function Shooter({ targetsRef, environmentRef, effectsRef, onShot, volume, missV
           showMiss();
         }
       }
-      onShot(hit ? hit.object.userData.targetKey : null);
+      onShot(hit ? hit.object.userData.targetKey : null, miss);
     };
     document.addEventListener('mousedown', handleMouseDown);
     return () => document.removeEventListener('mousedown', handleMouseDown);
@@ -123,6 +159,7 @@ export default function Scene() {
         sensitivity={settings.sensitivity}
         fov={settings.fov}
         reduceMotion={settings.reduceMotion}
+        gameSens={settings.gameSens}
         onEnterStart={beginEntering}
         onEntered={enterGame}
         onLeave={leaveGame}

@@ -9,6 +9,7 @@ import {
 } from '../../game/scoring';
 import { MODE_IDS, MODES } from '../../game/modes';
 import { PRACTICE_OPTIONS } from '../../game/practice';
+import { rankFor } from '../../game/ranks';
 import { avgHitMs, bestRunOf, PHASES } from '../../game/state';
 import { cleanName } from '../../game/username';
 import { track } from '../../analytics';
@@ -18,6 +19,9 @@ import { TARGET_COLORS, THEME_IDS, THEMES } from '../../themes';
 import { DEFAULT_SETTINGS, SETTING_LIMITS, useGame } from '../Context';
 import { Crosshair, CROSSHAIR_STYLES } from '../Crosshair';
 import Leaderboard from '../Leaderboard';
+import MissMap from '../MissMap';
+import RankBadge from '../Rank';
+import SensMatch from '../SensMatch';
 import SaveScore from '../Leaderboard/SaveScore';
 import ScoreCardButton from '../ScoreCard';
 import { nativeShare, scoreShareText, ShareAndFeedback, ShareButtons, useCopyLink } from '../Share';
@@ -296,7 +300,7 @@ function MainCard({ onOpenLeaderboard, guide, dimmed, onStarted }) {
           {topScorer && bestRun && ' · '}
           {bestRun && (
             <>
-              You <strong>{bestRun.score}</strong>
+              You <strong>{bestRun.score}</strong> <RankBadge rank={rankFor(game.mode, bestRun.score)} />
             </>
           )}
         </span>
@@ -529,6 +533,8 @@ function Results({ game }) {
         <span className={styles.scoreLabel}>
           {practice ? 'Practice score' : newBest ? 'New personal best!' : 'Score'}
         </span>
+        {/* Practice changes the difficulty, so it isn't ranked. */}
+        {!practice && completed && <RankBadge rank={rankFor(mode, score)} showNext size="large" />}
       </div>
       <dl className={styles.statGrid}>
         <Stat label="Hits" value={hits} />
@@ -540,6 +546,7 @@ function Results({ game }) {
         <Stat label="Streak bonus" value={`+${bonus}`} />
         <Stat label="Time per hit" value={hitMs === null ? '–' : `${Math.round(hitMs)}ms`} />
       </dl>
+      {clicks > 0 && <MissMap misses={game.misses} wild={game.wildMisses} />}
       {practice && (
         <p className={styles.practiceNote}>
           Practice run: {practice.duration}s, {practice.size}× targets, {practice.speed}× speed. Not saved to your stats
@@ -551,7 +558,15 @@ function Results({ game }) {
           <span className={styles.shareScoreLabel}>Share your score</span>
           <ShareButtons text={scoreShareText(score, name)} where="results" />
           <ScoreCardButton
-            run={{ score, modeName: name, accuracy: formatAccuracy(hits, clicks), bestStreak, hits, newBest }}
+            run={{
+              score,
+              modeName: name,
+              accuracy: formatAccuracy(hits, clicks),
+              bestStreak,
+              hits,
+              newBest,
+              rankId: rankFor(mode, score)?.id ?? null
+            }}
           />
         </div>
       )}
@@ -590,14 +605,17 @@ function Settings() {
 
   return (
     <section className={styles.settings}>
-      <Slider
-        id="sensitivity"
-        label="Sensitivity"
-        value={settings.sensitivity}
-        display={`${settings.sensitivity.toFixed(2)}×${settings.sensitivity === 1 ? ' (desktop)' : ''}`}
-        onChange={update('sensitivity')}
-        {...SETTING_LIMITS.sensitivity}
-      />
+      {!settings.gameSens && (
+        <Slider
+          id="sensitivity"
+          label="Sensitivity"
+          value={settings.sensitivity}
+          display={`${settings.sensitivity.toFixed(2)}×${settings.sensitivity === 1 ? ' (desktop)' : ''}`}
+          onChange={update('sensitivity')}
+          {...SETTING_LIMITS.sensitivity}
+        />
+      )}
+      <SensMatch />
       <label className={styles.toggle}>
         <input type="checkbox" checked={settings.rawInput} onChange={toggle('rawInput')} />
         Raw mouse input (ignores OS pointer speed and acceleration)

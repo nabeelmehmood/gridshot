@@ -21,7 +21,9 @@
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",
     "assets": "node scripts/generate-assets.mjs",
-    "remove-score": "node scripts/remove-score.mjs"
+    "remove-score": "node scripts/remove-score.mjs",
+    "pages": "node scripts/generate-mode-pages.mjs",
+    "prebuild": "npm run pages"
   },
   "dependencies": {
     "@react-three/fiber": "^9.8.2",
