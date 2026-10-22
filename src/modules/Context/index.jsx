@@ -298,7 +298,7 @@ export function GameContextProvider({ children }) {
     // Offline or server errors just leave the run unsubmittable; the game itself is unaffected.
     registerRun(game.mode).then(
       runId => dispatch({ type: 'runRegistered', runKey, runId }),
-      () => {}
+      error => dispatch({ type: 'runNotRegistered', runKey, reason: error.busy ? 'busy' : 'offline' })
     );
   }, [game.mode, settings.theme, settings.crosshair.style, settings.practice]);
 

@@ -27,7 +27,12 @@ export async function registerRun(mode) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ mode })
   });
-  if (!res.ok) throw new Error(`Run registration failed (${res.status})`);
+  if (!res.ok) {
+    const error = new Error(`Run registration failed (${res.status})`);
+    // 429: the server's rate limit, not a connection problem.
+    error.busy = res.status === 429;
+    throw error;
+  }
   const data = await res.json();
   if (typeof data.runId !== 'string') throw new Error('Run registration failed');
   return data.runId;

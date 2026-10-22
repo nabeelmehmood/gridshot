@@ -386,3 +386,13 @@ describe('sensitivity matching', () => {
     expect(isGameSens(null)).toBe(true);
   });
 });
+
+describe('run registration', () => {
+  it('remembers why a run has no token, for that run only', () => {
+    let state = play(createInitialState(), start(1), { type: 'runNotRegistered', runKey: 1, reason: 'busy' });
+    expect(state.runIssue).toBe('busy');
+    expect(play(state, { type: 'runNotRegistered', runKey: 0, reason: 'offline' }).runIssue).toBe('busy');
+    state = play(state, ...ticks(GAME_DURATION), start(2));
+    expect(state.runIssue).toBeNull();
+  });
+});

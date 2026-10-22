@@ -87,10 +87,12 @@ const MAX_INSTANCES = 2;
 // 128MB ran out of memory with firebase-admin loaded (seen in the logs on 2026-10-21).
 const runtime = functions.runWith({ maxInstances: MAX_INSTANCES, memory: '256MB', timeoutSeconds: 10 });
 
-// A run takes 60s, so 5 starts/min per player leaves room for restarts after Esc.
+// R and Space restart instantly, so players can start many runs a minute; 12 per IP also leaves room
+// for players sharing one connection. Worst case at these totals is a few tens of cents a day in
+// Firestore writes, and the instance cap and kill switch still bound everything.
 const limits = {
-  startRun: createLimiter({ name: 'startRun', perIp: 5, total: 30, logger: functions.logger }),
-  addScore: createLimiter({ name: 'addScore', perIp: 5, total: 20, logger: functions.logger }),
+  startRun: createLimiter({ name: 'startRun', perIp: 12, total: 60, logger: functions.logger }),
+  addScore: createLimiter({ name: 'addScore', perIp: 5, total: 40, logger: functions.logger }),
   getTopScores: createLimiter({ name: 'getTopScores', perIp: 30, total: 300, logger: functions.logger })
 };
 

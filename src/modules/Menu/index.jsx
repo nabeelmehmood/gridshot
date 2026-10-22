@@ -267,7 +267,9 @@ function MainCard({ onOpenLeaderboard, guide, dimmed, onStarted }) {
       )}
       {finished && game.newBest && !bestRun?.runId && (
         <p className={styles.warning}>
-          The leaderboard server couldn&apos;t be reached when this run started, so it can&apos;t be submitted.
+          {game.runIssue === 'busy'
+            ? 'The leaderboard was too busy to register this run when it started, so it can’t be submitted. Your next run should be fine.'
+            : 'The leaderboard server couldn’t be reached when this run started, so it can’t be submitted.'}
         </p>
       )}
       {canSave && <SaveScore />}

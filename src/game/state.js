@@ -53,6 +53,8 @@ export function createInitialState({ mode = DEFAULT_MODE, bestRuns = {}, history
     nextKey: 3,
     runKey: null,
     runId: null,
+    // Why the current run has no token: 'busy' (rate limited) or 'offline'; null otherwise.
+    runIssue: null,
     completed: false,
     newBest: false,
     bestRuns,
@@ -176,6 +178,7 @@ export function gameReducer(state, action) {
           practice: action.practice ?? null,
           runKey: action.runKey,
           runId: null,
+          runIssue: null,
           completed: false,
           newBest: false
         },
@@ -192,6 +195,8 @@ export function gameReducer(state, action) {
         bestRuns: patchBest ? { ...state.bestRuns, [state.mode]: { ...best, runId: action.runId } } : state.bestRuns
       };
     }
+    case 'runNotRegistered':
+      return action.runKey === state.runKey ? { ...state, runIssue: action.reason } : state;
     case 'tick': {
       if (state.phase !== PHASES.RUNNING) return state;
       const ticked = { ...state, elapsed: state.elapsed + 1, timeline: [...state.timeline, scoreOf(state)] };
