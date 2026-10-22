@@ -10,8 +10,10 @@ const isValidEntry = (user, mode) =>
   user.score > 0 &&
   (MODES[mode]?.untimed || user.score <= MAX_SCORE);
 
-export async function fetchTopScores(mode) {
-  const res = await fetch(`${API_BASE}/getTopScores?mode=${encodeURIComponent(mode)}`);
+// period: 'all' for all-time bests, 'week' for this ISO week (resets Monday 00:00 UTC).
+export async function fetchTopScores(mode, period = 'all') {
+  const params = new URLSearchParams({ mode, period });
+  const res = await fetch(`${API_BASE}/getTopScores?${params}`);
   if (!res.ok) throw new Error(`Leaderboard request failed (${res.status})`);
   const data = await res.json();
   return Array.isArray(data.users) ? data.users.filter(user => isValidEntry(user, mode)) : [];

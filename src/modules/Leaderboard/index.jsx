@@ -11,9 +11,11 @@ export default function Leaderboard({ onClose, initialView = 'board' }) {
   const { game, leaderboardFor, loadLeaderboard } = useGame();
   const [viewMode, setViewMode] = useState(game.mode);
   const [view, setView] = useState(initialView);
+  // 'all' or 'week' (the ISO week, reset Monday 00:00 UTC).
+  const [period, setPeriod] = useState('all');
   const dialogRef = useRef(null);
   const ownName = readStored('username', value => typeof value === 'string', '');
-  const leaderboard = leaderboardFor(viewMode);
+  const leaderboard = leaderboardFor(viewMode, period);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -35,12 +37,17 @@ export default function Leaderboard({ onClose, initialView = 'board' }) {
 
   const showMode = nextMode => {
     setViewMode(nextMode);
-    if (view === 'board') loadLeaderboard(nextMode);
+    if (view === 'board') loadLeaderboard(nextMode, period);
   };
 
   const showView = nextView => {
     setView(nextView);
-    if (nextView === 'board') loadLeaderboard(viewMode);
+    if (nextView === 'board') loadLeaderboard(viewMode, period);
+  };
+
+  const showPeriod = nextPeriod => {
+    setPeriod(nextPeriod);
+    loadLeaderboard(viewMode, nextPeriod);
   };
 
   return (
@@ -85,19 +92,33 @@ export default function Leaderboard({ onClose, initialView = 'board' }) {
 
         {view === 'stats' && <StatsPanel mode={viewMode} />}
 
+        {view === 'board' && (
+          <div className={styles.periodRow}>
+            <div className={styles.periodSwitch} role="group" aria-label="Period">
+              <button type="button" aria-pressed={period === 'all'} onClick={() => showPeriod('all')}>
+                All time
+              </button>
+              <button type="button" aria-pressed={period === 'week'} onClick={() => showPeriod('week')}>
+                This week
+              </button>
+            </div>
+            {period === 'week' && <span className={styles.periodNote}>Resets Monday 00:00 UTC</span>}
+          </div>
+        )}
+
         {view === 'board' && leaderboard.status === 'loading' && leaderboard.users.length === 0 && (
           <p className={styles.notice}>Loading scores…</p>
         )}
         {view === 'board' && leaderboard.status === 'error' && (
           <p className={styles.notice}>
             Couldn&apos;t load the leaderboard.{' '}
-            <button type="button" className={styles.linkButton} onClick={() => loadLeaderboard(viewMode)}>
+            <button type="button" className={styles.linkButton} onClick={() => loadLeaderboard(viewMode, period)}>
               Try again
             </button>
           </p>
         )}
         {view === 'board' && leaderboard.status === 'ready' && leaderboard.users.length === 0 && (
-          <p className={styles.notice}>No scores yet. Be the first.</p>
+          <p className={styles.notice}>{period === 'week' ? 'No scores this week yet. Be the first.' : 'No scores yet. Be the first.'}</p>
         )}
 
         {view === 'board' && leaderboard.users.length > 0 && (

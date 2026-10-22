@@ -9,7 +9,7 @@ import {
 } from './scoring';
 import { MODES, ROLL_COUNT, respawnTarget, skeetPosition, spawnTargets, strafePosition } from './modes';
 import { pickFreeSlot, pickTargets, TARGET_SLOTS } from './targets';
-import { bestRunOf, createInitialState, gameReducer, HISTORY_SIZE, paceVsBest, PHASES } from './state';
+import { avgHitMs, bestRunOf, createInitialState, gameReducer, HISTORY_SIZE, paceVsBest, PHASES } from './state';
 import { USERNAME_PATTERN } from './username';
 
 const rolls = value => Array.from({ length: ROLL_COUNT }, () => value);
@@ -296,5 +296,39 @@ describe('timeline, history and pacing', () => {
     expect(state.history.gridshot.count).toBe(HISTORY_SIZE + 2);
     expect(state.history.gridshot.runs).toHaveLength(HISTORY_SIZE);
     expect(state.history.gridshot.runs.at(-1)).toMatchObject({ score: 0, hits: 0, seconds: GAME_DURATION });
+  });
+});
+
+describe('practice runs and hit timing', () => {
+  const hitAt = (state, at) => ({ type: 'shot', targetKey: state.targets[0].key, rolls: rolls(0.6), at });
+
+  it('times each hit from the run start or the previous hit', () => {
+    let state = play(createInitialState(), { ...start(), at: 1000 });
+    state = play(state, hitAt(state, 1400));
+    state = play(state, { type: 'shot', targetKey: null, rolls: rolls(0.6), at: 1700 });
+    state = play(state, hitAt(state, 2000));
+    expect(state.hitTime).toBe(1000);
+    expect(avgHitMs(state)).toBe(500);
+    state = play(state, ...ticks(GAME_DURATION));
+    expect(state.history.gridshot.runs.at(-1).avgHitMs).toBe(500);
+  });
+
+  it('has no timing without timestamps', () => {
+    const state = play(createInitialState(), start(), shot(null));
+    expect(avgHitMs(state)).toBeNull();
+  });
+
+  it('uses its own length and never touches bests, history or pacing', () => {
+    let state = play(createInitialState(), start(1), ...ticks(GAME_DURATION));
+    const { bestRuns, history } = state;
+    const practice = { duration: 30, size: 1.5, speed: 0.5 };
+    state = play(state, { ...start(2), practice });
+    expect(state).toMatchObject({ timeLeft: 30, practice });
+    state = play(state, shot(state.targets[0].key), { type: 'tick' });
+    expect(paceVsBest(state)).toBeNull();
+    state = play(state, ...ticks(29));
+    expect(state).toMatchObject({ phase: PHASES.FINISHED, completed: true, newBest: false });
+    expect(state.bestRuns).toBe(bestRuns);
+    expect(state.history).toBe(history);
   });
 });

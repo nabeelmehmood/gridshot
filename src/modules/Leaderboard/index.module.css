@@ -241,3 +241,37 @@
   font-size: 13px;
   color: var(--danger);
 }
+
+.periodRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-bottom: 10px;
+}
+
+.periodSwitch {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.periodSwitch button {
+  padding: 3px 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.periodSwitch button[aria-pressed='true'] {
+  border-color: var(--panel-border);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+.periodNote {
+  font-size: 12px;
+  color: var(--muted);
+}

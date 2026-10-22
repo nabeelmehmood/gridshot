@@ -1,3 +1,5 @@
+import { themeAccent } from '../../themes';
+
 // Score card: a 1200×630 PNG (the size link previews and chat apps show well) in the current theme.
 const WIDTH = 1200;
 const HEIGHT = 630;
@@ -71,7 +73,7 @@ export async function renderScoreCard({ score, modeName, accuracy, bestStreak, h
   canvas.height = HEIGHT;
   const ctx = canvas.getContext('2d');
   const [top, wave, bottom] = theme.swatch;
-  const { accent, accentText } = theme.ui;
+  const { accent, accentText } = themeAccent(theme);
 
   ctx.fillStyle = '#0d1017';
   ctx.fillRect(0, 0, WIDTH, HEIGHT);

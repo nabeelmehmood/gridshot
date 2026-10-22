@@ -117,6 +117,34 @@ export const THEMES = {
 export const THEME_IDS = Object.keys(THEMES);
 export const DEFAULT_THEME = 'playground';
 
+// Target colour setting. Picks avoid relying on red against green or brown, which the common forms
+// of colour blindness confuse; each is drawn as a plain sphere with a near-black rim so it reads on
+// any backdrop.
+export const TARGET_COLORS = [
+  { id: 'theme', label: 'Theme' },
+  { id: '#ffd60a', label: 'Yellow' },
+  { id: '#38bdf8', label: 'Sky blue' },
+  { id: '#ff9500', label: 'Orange' },
+  { id: '#ff3dd4', label: 'Magenta' },
+  { id: '#ffffff', label: 'White' }
+];
+
+const CUSTOM_TARGET_OUTLINE = '#0b0b0f';
+
+// How targets are drawn for a theme and the player's target colour setting.
+export function targetLook(theme, targetColor) {
+  if (targetColor === 'theme') {
+    return { color: theme.targetColor, outline: theme.outline, style: theme.targetStyle, haloColor: theme.haloColor };
+  }
+  return { color: targetColor, outline: CUSTOM_TARGET_OUTLINE, style: undefined, haloColor: targetColor };
+}
+
+// Accent colours for things drawn outside CSS (the score card); Classic has no `ui` and uses the defaults.
+export const themeAccent = theme => ({
+  accent: theme.ui?.accent ?? '#ffcf33',
+  accentText: theme.ui?.accentText ?? '#1a1400'
+});
+
 const UI_VARIABLES = {
   accent: '--accent',
   accentText: '--accent-text',

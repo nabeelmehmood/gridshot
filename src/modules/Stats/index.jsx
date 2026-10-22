@@ -23,6 +23,8 @@ export default function StatsPanel({ mode }) {
   const best = Math.max(bestRun?.score ?? -Infinity, ...runs.map(run => run.score));
   const hits = recent.reduce((sum, run) => sum + run.hits, 0);
   const clicks = recent.reduce((sum, run) => sum + run.clicks, 0);
+  // Runs from before hit timing was recorded have no avgHitMs.
+  const timed = recent.map(run => run.avgHitMs).filter(Number.isFinite);
 
   return (
     <div className={styles.stats}>
@@ -30,12 +32,13 @@ export default function StatsPanel({ mode }) {
         <Tile label="Best" value={best} />
         <Tile label="Average" value={Math.round(average(recent.map(run => run.score)))} />
         <Tile label="Accuracy" value={formatAccuracy(hits, clicks)} />
+        <Tile label="Time per hit" value={timed.length ? `${Math.round(average(timed))}ms` : '–'} />
         <Tile label="Best streak" value={Math.max(0, ...runs.map(run => run.bestStreak ?? 0))} />
         <Tile label="Runs" value={history.count} />
       </dl>
       <ScoreChart scores={runs.map(run => run.score)} best={best} />
       <Trend scores={runs.map(run => run.score)} />
-      <p className={styles.note}>Average and accuracy cover your last {recent.length} runs. Stats stay in this browser.</p>
+      <p className={styles.note}>Average, accuracy and time per hit cover your last {recent.length} runs. Stats stay in this browser.</p>
     </div>
   );
 }

@@ -2,11 +2,12 @@ import { createContext, useCallback, useContext, useEffect, useReducer, useRef, 
 import { track } from '../../analytics';
 import { fetchTopScores, registerRun } from '../../api';
 import { DEFAULT_MODE, MODES, newRolls } from '../../game/modes';
+import { DEFAULT_PRACTICE, isPracticeSettings, practiceRun } from '../../game/practice';
 import { calculateAccuracy, calculateScore } from '../../game/scoring';
-import { createInitialState, gameReducer, PHASES } from '../../game/state';
+import { avgHitMs, createInitialState, gameReducer, PHASES } from '../../game/state';
 import { playCountdown, resetStreak, unlockAudio } from '../../sound';
 import { readStored, writeStored } from '../../storage';
-import { DEFAULT_THEME, THEMES } from '../../themes';
+import { DEFAULT_THEME, TARGET_COLORS, THEMES } from '../../themes';
 import { CROSSHAIR_STYLES } from '../Crosshair';
 
 export const DEFAULT_SETTINGS = {
@@ -17,7 +18,10 @@ export const DEFAULT_SETTINGS = {
   effects: true,
   rawInput: false,
   customCursor: true,
-  crosshair: { style: 'cross', color: '#ffffff', size: 22, thickness: 2, gap: 4, outline: true }
+  crosshair: { style: 'cross', color: '#ffffff', size: 22, thickness: 2, gap: 4, outline: true },
+  // 'theme' uses the theme's own target look; any other id is a high-contrast colour (see TARGET_COLORS).
+  targetColor: 'theme',
+  practice: DEFAULT_PRACTICE
 };
 
 export const SETTING_LIMITS = {
@@ -43,6 +47,8 @@ const isCrosshair = value =>
 
 const LOCK_ERROR = 'Mouse capture was blocked. Wait a second and press Start again.';
 const EMPTY_LEADERBOARD = { status: 'loading', users: [] };
+// Leaderboards are cached per mode and period ('all' or 'week').
+const boardKey = (boardMode, period) => `${boardMode}:${period}`;
 
 const isNumber = value => typeof value === 'number' && Number.isFinite(value);
 const inRange = key => value =>
@@ -93,7 +99,9 @@ const loadSettings = () => ({
   effects: readStored('effects', value => typeof value === 'boolean', DEFAULT_SETTINGS.effects),
   rawInput: readStored('rawInput', value => typeof value === 'boolean', DEFAULT_SETTINGS.rawInput),
   customCursor: readStored('customCursor', value => typeof value === 'boolean', DEFAULT_SETTINGS.customCursor),
-  crosshair: readStored('crosshair', isCrosshair, DEFAULT_SETTINGS.crosshair)
+  crosshair: readStored('crosshair', isCrosshair, DEFAULT_SETTINGS.crosshair),
+  targetColor: readStored('targetColor', value => TARGET_COLORS.some(color => color.id === value), DEFAULT_SETTINGS.targetColor),
+  practice: readStored('practice', isPracticeSettings, DEFAULT_SETTINGS.practice)
 });
 
 // By default the browser applies the OS pointer speed and acceleration, so 1× feels like the desktop.
@@ -126,6 +134,8 @@ export function GameContextProvider({ children }) {
 
   // One event per run as it ends: finished runs report the result, Esc reports how long it lasted.
   const { completed, hits, clicks, expired, bonus, bestStreak, newBest, elapsed } = game;
+  const practice = Boolean(game.practice);
+  const hitMs = avgHitMs(game);
   useEffect(() => {
     if (phase !== PHASES.FINISHED) return;
     if (completed) {
@@ -134,12 +144,14 @@ export function GameContextProvider({ children }) {
         score: calculateScore(hits, clicks, expired, bonus),
         accuracy: Math.round((calculateAccuracy(hits, clicks) ?? 0) * 10) / 10,
         best_streak: bestStreak,
-        new_best: newBest
+        avg_hit_ms: hitMs === null ? null : Math.round(hitMs),
+        new_best: newBest,
+        practice
       });
     } else {
-      track('run_abandon', { mode, seconds_played: elapsed });
+      track('run_abandon', { mode, seconds_played: elapsed, practice });
     }
-  }, [phase, completed, mode, hits, clicks, expired, bonus, bestStreak, newBest, elapsed]);
+  }, [phase, completed, mode, hits, clicks, expired, bonus, bestStreak, hitMs, newBest, elapsed, practice]);
 
   useEffect(() => {
     writeStored('mode', mode);
@@ -162,6 +174,8 @@ export function GameContextProvider({ children }) {
     writeStored('effects', settings.effects);
     writeStored('crosshair', settings.crosshair);
     writeStored('customCursor', settings.customCursor);
+    writeStored('targetColor', settings.targetColor);
+    writeStored('practice', settings.practice);
   }, [settings]);
 
   useEffect(() => {
@@ -170,13 +184,15 @@ export function GameContextProvider({ children }) {
     return () => clearInterval(timer);
   }, [phase]);
 
-  // Skeet keeps throwing discs on a fixed rhythm; the reducer caps how many are in the air.
+  // Skeet keeps throwing discs on a fixed rhythm (faster or slower in practice); the reducer caps how
+  // many are in the air.
   const { launchEveryMs } = MODES[mode];
+  const speed = game.practice?.speed ?? 1;
   useEffect(() => {
     if (phase !== PHASES.RUNNING || !launchEveryMs) return undefined;
-    const launcher = setInterval(() => dispatch({ type: 'launch', rolls: newRolls() }), launchEveryMs);
+    const launcher = setInterval(() => dispatch({ type: 'launch', rolls: newRolls() }), launchEveryMs / speed);
     return () => clearInterval(launcher);
-  }, [phase, launchEveryMs]);
+  }, [phase, launchEveryMs, speed]);
 
   useEffect(() => {
     if (phase === PHASES.FINISHED && document.pointerLockElement) {
@@ -184,37 +200,43 @@ export function GameContextProvider({ children }) {
     }
   }, [phase]);
 
-  const loadLeaderboard = useCallback(
-    boardMode =>
-      fetchTopScores(boardMode).then(
-        users => setLeaderboards(current => ({ ...current, [boardMode]: { status: 'ready', users } })),
-        () =>
-          setLeaderboards(current => ({
-            ...current,
-            [boardMode]: { ...(current[boardMode] ?? EMPTY_LEADERBOARD), status: 'error' }
-          }))
-      ),
-    []
-  );
+  const loadLeaderboard = useCallback((boardMode, period = 'all') => {
+    const key = boardKey(boardMode, period);
+    return fetchTopScores(boardMode, period).then(
+      users => setLeaderboards(current => ({ ...current, [key]: { status: 'ready', users } })),
+      () =>
+        setLeaderboards(current => ({
+          ...current,
+          [key]: { ...(current[key] ?? EMPTY_LEADERBOARD), status: 'error' }
+        }))
+    );
+  }, []);
 
   useEffect(() => {
     loadLeaderboard(mode);
   }, [loadLeaderboard, mode]);
 
-  const leaderboardFor = useCallback(boardMode => leaderboards[boardMode] ?? EMPTY_LEADERBOARD, [leaderboards]);
+  const leaderboardFor = useCallback(
+    (boardMode, period = 'all') => leaderboards[boardKey(boardMode, period)] ?? EMPTY_LEADERBOARD,
+    [leaderboards]
+  );
 
   // The server caches the leaderboard for 30s, so a refetch right after saving could miss the new
   // score; insert it locally instead.
+  // The server keeps one entry per name (its best) on each board, so mirror that here.
   const recordSavedScore = useCallback((boardMode, entry) => {
+    const name = entry.username.toLowerCase();
     setLeaderboards(current => {
-      const board = current[boardMode] ?? EMPTY_LEADERBOARD;
-      // The server keeps one entry per name (its best), so mirror that here.
-      const name = entry.username.toLowerCase();
-      const previous = board.users.find(user => user.username.toLowerCase() === name);
-      if (previous && previous.score >= entry.score) return current;
-      const others = board.users.filter(user => user.username.toLowerCase() !== name);
-      const users = [...others, entry].sort((a, b) => b.score - a.score).slice(0, 50);
-      return { ...current, [boardMode]: { status: 'ready', users } };
+      const next = { ...current };
+      for (const period of ['all', 'week']) {
+        const key = boardKey(boardMode, period);
+        const board = current[key] ?? EMPTY_LEADERBOARD;
+        const previous = board.users.find(user => user.username.toLowerCase() === name);
+        if (previous && previous.score >= entry.score) continue;
+        const others = board.users.filter(user => user.username.toLowerCase() !== name);
+        next[key] = { status: 'ready', users: [...others, entry].sort((a, b) => b.score - a.score).slice(0, 50) };
+      }
+      return next;
     });
   }, []);
 
@@ -235,14 +257,22 @@ export function GameContextProvider({ children }) {
     resetStreak();
     runCounter.current += 1;
     const runKey = runCounter.current;
-    dispatch({ type: 'start', runKey, rolls: newRolls() });
-    track('run_start', { mode: game.mode, theme: settings.theme, crosshair: settings.crosshair.style });
+    const practiceSettings = practiceRun(settings.practice);
+    dispatch({ type: 'start', runKey, rolls: newRolls(), practice: practiceSettings, at: performance.now() });
+    track('run_start', {
+      mode: game.mode,
+      theme: settings.theme,
+      crosshair: settings.crosshair.style,
+      practice: Boolean(practiceSettings)
+    });
+    // Practice runs are never submitted, so they don't need a token.
+    if (practiceSettings) return;
     // Offline or server errors just leave the run unsubmittable; the game itself is unaffected.
     registerRun(game.mode).then(
       runId => dispatch({ type: 'runRegistered', runKey, runId }),
       () => {}
     );
-  }, [game.mode, settings.theme, settings.crosshair.style]);
+  }, [game.mode, settings.theme, settings.crosshair.style, settings.practice]);
 
   const endRun = useCallback(() => dispatch({ type: 'finish' }), []);
 
@@ -277,7 +307,10 @@ export function GameContextProvider({ children }) {
     }, COUNTDOWN_STEP_MS);
     return () => clearTimeout(timer);
   }, [countdown, settings.volume, startRun]);
-  const shoot = useCallback(targetKey => dispatch({ type: 'shot', targetKey, rolls: newRolls() }), []);
+  const shoot = useCallback(
+    targetKey => dispatch({ type: 'shot', targetKey, rolls: newRolls(), at: performance.now() }),
+    []
+  );
   const expire = useCallback(targetKey => dispatch({ type: 'expire', targetKey, rolls: newRolls() }), []);
   const selectMode = useCallback(nextMode => {
     track('mode_select', { mode: nextMode });

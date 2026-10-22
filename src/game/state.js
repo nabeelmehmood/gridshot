@@ -11,6 +11,10 @@ export const PHASES = {
 // with lostStreak the length of the last one, so the HUD can flash when one breaks.
 const FRESH_STREAK = { streak: 0, bestStreak: 0, bonus: 0, streakBreaks: 0, lostStreak: 0 };
 
+// hitTime: milliseconds from the start (or the previous hit) to each hit, summed; lastHitAt is the
+// clock reading of the run start or the last hit. Shots carry `at` from performance.now().
+const FRESH_TIMING = { hitTime: 0, lastHitAt: null };
+
 // Finished runs kept per mode for the stats view.
 export const HISTORY_SIZE = 20;
 
@@ -29,7 +33,9 @@ export function createInitialState({ mode = DEFAULT_MODE, bestRuns = {}, history
     clicks: 0,
     expired: 0,
     ...FRESH_STREAK,
+    ...FRESH_TIMING,
     timeline: [],
+    practice: null,
     targets: spawnTargets(mode, 0, newRolls()),
     nextKey: 3,
     runKey: null,
@@ -45,6 +51,7 @@ export const bestRunOf = state => state.bestRuns[state.mode] ?? null;
 
 // Current score minus the best run's score after the same number of seconds; null with nothing to compare.
 export function paceVsBest(state) {
+  if (state.practice) return null;
   const best = bestRunOf(state)?.timeline;
   const second = state.timeline.length - 1;
   if (!best || second < 0 || second >= best.length) return null;
@@ -53,19 +60,25 @@ export function paceVsBest(state) {
 
 const scoreOf = state => calculateScore(state.hits, state.clicks, state.expired, state.bonus);
 
+// Average milliseconds per hit this run, or null before the first timed hit.
+export const avgHitMs = state => (state.hits > 0 && state.hitTime > 0 ? state.hitTime / state.hits : null);
+
 function breakStreak(state) {
   if (state.streak < STREAK_STEP) return { ...state, streak: 0 };
   return { ...state, streak: 0, streakBreaks: state.streakBreaks + 1, lostStreak: state.streak };
 }
 
-function countHit(state) {
+function countHit(state, at) {
   const streak = state.streak + 1;
+  const timed = typeof at === 'number' && state.lastHitAt !== null;
   return {
     ...state,
     hits: state.hits + 1,
     streak,
     bestStreak: Math.max(state.bestStreak, streak),
-    bonus: state.bonus + streakBonus(streak)
+    bonus: state.bonus + streakBonus(streak),
+    hitTime: timed ? state.hitTime + Math.max(0, at - state.lastHitAt) : state.hitTime,
+    lastHitAt: typeof at === 'number' ? at : state.lastHitAt
   };
 }
 
@@ -91,11 +104,13 @@ function topUpSurvival(state, rolls) {
 
 // Only runs that end on their own (timer out, or lives out in Survival) count; Esc can't set a best.
 function finishRun(state, completed) {
+  if (state.practice) return { ...state, phase: PHASES.FINISHED, completed, newBest: false };
   const { mode, hits, clicks, expired, bonus, bestStreak, timeline, elapsed, runId } = state;
   const score = scoreOf(state);
+  const avgMs = avgHitMs(state);
   const newBest = completed && score > (bestRunOf(state)?.score ?? 0);
   const past = state.history[mode] ?? { count: 0, runs: [] };
-  const run = { score, hits, clicks, expired, bonus, bestStreak, seconds: elapsed };
+  const run = { score, hits, clicks, expired, bonus, bestStreak, seconds: elapsed, avgHitMs: avgMs === null ? null : Math.round(avgMs) };
   return {
     ...state,
     phase: PHASES.FINISHED,
@@ -123,14 +138,17 @@ export function gameReducer(state, action) {
         {
           ...state,
           phase: PHASES.RUNNING,
-          timeLeft: GAME_DURATION,
+          timeLeft: action.practice?.duration ?? GAME_DURATION,
           elapsed: 0,
           lives: MODES[state.mode].lives ?? null,
           hits: 0,
           clicks: 0,
           expired: 0,
           ...FRESH_STREAK,
+          ...FRESH_TIMING,
+          lastHitAt: typeof action.at === 'number' ? action.at : null,
           timeline: [],
+          practice: action.practice ?? null,
           runKey: action.runKey,
           runId: null,
           completed: false,
@@ -161,7 +179,7 @@ export function gameReducer(state, action) {
       const hit = action.targetKey != null && state.targets.some(target => target.key === action.targetKey);
       const clicked = { ...state, clicks: state.clicks + 1 };
       if (!hit) return breakStreak(clicked);
-      const counted = countHit(clicked);
+      const counted = countHit(clicked, action.at);
       // Skeet discs are gone once hit; the launcher sends the next one.
       if (state.mode === 'skeet') return withoutTarget(counted, action.targetKey);
       return topUpSurvival(respawn(counted, action.targetKey, action.rolls), action.rolls);

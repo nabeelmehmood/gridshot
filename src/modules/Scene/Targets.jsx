@@ -89,8 +89,9 @@ function Shape({ disc, radius, segments = 32 }) {
 }
 
 // Every target scales in on spawn. Optional: `lifetime` (seconds) shrinks it before it expires,
-// `path` moves it along a closed-form path, `bounce` integrates a bouncing ball.
-function Target({ target, radius, color, outline, style, halo, haloColor, disc, lifetime, path, bounce }) {
+// `path` moves it along a closed-form path, `bounce` integrates a bouncing ball. `speed` scales
+// motion (practice runs).
+function Target({ target, radius, color, outline, style, halo, haloColor, disc, lifetime, path, bounce, speed = 1 }) {
   const meshRef = useRef(null);
   const bornAt = useRef(null);
   const motion = useRef(bounce ? { x: target.x, y: target.y, vx: target.vx, vy: 0 } : null);
@@ -117,7 +118,7 @@ function Target({ target, radius, color, outline, style, halo, haloColor, disc, 
     else if (style === 'floatie') mesh.rotation.y += delta * 0.8;
 
     if (path) {
-      const [x, y] = path(target, age);
+      const [x, y] = path(target, age * speed);
       mesh.position.set(x, y, 0);
     } else if (style === 'pearl' && !motion.current) {
       // Pearls drift up and down a touch, as if floating.
@@ -126,7 +127,7 @@ function Target({ target, radius, color, outline, style, halo, haloColor, disc, 
     if (motion.current) {
       const m = motion.current;
       const { minX, maxX, minY, maxY, gravity } = BOUNCE_BOUNDS;
-      const step = Math.min(delta, 0.05);
+      const step = Math.min(delta, 0.05) * speed;
       m.vy -= gravity * step;
       m.x += m.vx * step;
       m.y += m.vy * step;
@@ -179,9 +180,27 @@ function ExpiryTimer({ targetKey, lifetimeMs, running, onExpire }) {
   return null;
 }
 
-export default function Targets({ mode, targets, running, visible, onExpire, color, outline, style, halo, haloColor, ref }) {
+export default function Targets({
+  mode,
+  targets,
+  running,
+  visible,
+  onExpire,
+  color,
+  outline,
+  style,
+  halo,
+  haloColor,
+  size = 1,
+  speed = 1,
+  ref
+}) {
   const config = MODES[mode];
-  const lifetimeOf = target => target.lifetimeMs ?? config.lifetimeMs ?? null;
+  // Faster practice runs shorten every lifetime (and Skeet flight times) to match.
+  const lifetimeOf = target => {
+    const lifetimeMs = target.lifetimeMs ?? config.lifetimeMs ?? null;
+    return lifetimeMs === null ? null : lifetimeMs / speed;
+  };
 
   return (
     <group ref={ref} position={[0, 0, -8]} visible={visible}>
@@ -191,7 +210,7 @@ export default function Targets({ mode, targets, running, visible, onExpire, col
           <Target
             key={target.key}
             target={target}
-            radius={config.radius}
+            radius={config.radius * size}
             color={color}
             outline={outline}
             style={style}
@@ -201,6 +220,7 @@ export default function Targets({ mode, targets, running, visible, onExpire, col
             lifetime={running && lifetimeMs && SHRINKS.has(mode) ? lifetimeMs / 1000 : null}
             path={PATHS[mode] ?? null}
             bounce={mode === 'bounce'}
+            speed={speed}
           />
         );
       })}

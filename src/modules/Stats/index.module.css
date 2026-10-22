@@ -12,15 +12,9 @@
 
 .tiles {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   margin: 0;
-}
-
-@media (max-width: 460px) {
-  .tiles {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }
 
 /* Value above label; column-reverse with flex-end keeps every value on the same line when a label wraps. */

@@ -37,7 +37,7 @@ export default function Hud() {
       </div>
       <Streak streak={streak} streakBreaks={streakBreaks} lostStreak={lostStreak} pace={paceVsBest(game)} />
       <Crosshair className={styles.crosshair} {...settings.crosshair} />
-      <div className={styles.hint}>Esc to end run</div>
+      <div className={styles.hint}>{game.practice ? 'Practice run, not saved · Esc to end run' : 'Esc to end run'}</div>
     </div>
   );
 }

@@ -16,7 +16,19 @@ const profanity = new Filter();
 
 // 'UserScores' holds the pre-validation leaderboard full of forged entries; it is no longer read.
 const SCORES = 'LeaderboardScores';
+// Best per player per mode per ISO week (Monday 00:00 UTC to Sunday), for the "This week" board.
+const WEEKLY_SCORES = 'WeeklyScores';
 const RUNS = 'Runs';
+const PERIODS = ['all', 'week'];
+
+// ISO 8601 week in UTC, e.g. '2026-W43'. The year is the one the week's Thursday falls in.
+function isoWeek(date = new Date()) {
+  const day = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  day.setUTCDate(day.getUTCDate() + 4 - (day.getUTCDay() || 7));
+  const yearStart = Date.UTC(day.getUTCFullYear(), 0, 1);
+  const week = Math.ceil(((day - yearStart) / 86400000 + 1) / 7);
+  return `${day.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+}
 
 // Must match src/game/username.js.
 const USERNAME_PATTERN = /^(?=[a-zA-Z0-9._-]{3,16}$)(?!.*[._-]{2})[^._-].*[^._-]$/;
@@ -171,25 +183,24 @@ exports.addScore = runtime.https.onRequest((req, res) =>
           if (hits > MAX_HITS || clicks > MAX_CLICKS) throw new RejectedRun('Invalid run.');
         }
 
-        // One entry per player per mode, so the board shows each name once with their best run.
-        const bestRef = db.collection(SCORES).doc(`${mode}_${username.toLowerCase()}`);
-        const best = await tx.get(bestRef);
+        // One entry per player per mode (and per week), so each board shows a name once with its best.
+        // Transactions need every read before the first write.
+        const name = username.toLowerCase();
+        const week = isoWeek();
+        const bestRef = db.collection(SCORES).doc(`${mode}_${name}`);
+        const weeklyRef = db.collection(WEEKLY_SCORES).doc(`${mode}_${week}_${name}`);
+        const [best, weekly] = await Promise.all([tx.get(bestRef), tx.get(weeklyRef)]);
         tx.update(runRef, { usedAt: FieldValue.serverTimestamp() });
-        if (best.exists && best.get('score') >= score) {
-          return `Your best of ${best.get('score')} still stands.`;
-        }
-        tx.set(bestRef, {
-          username,
-          mode,
-          score,
-          hits,
-          clicks,
-          expired,
-          bonus,
-          runId,
-          createdAt: FieldValue.serverTimestamp()
-        });
-        return `Saved ${score} for ${username}.`;
+
+        const entry = { username, mode, score, hits, clicks, expired, bonus, runId, createdAt: FieldValue.serverTimestamp() };
+        const newWeekly = !weekly.exists || weekly.get('score') < score;
+        const newBest = !best.exists || best.get('score') < score;
+        if (newWeekly) tx.set(weeklyRef, { ...entry, week });
+        if (newBest) tx.set(bestRef, entry);
+
+        if (newBest) return `Saved ${score} for ${username}.`;
+        if (newWeekly) return `Saved ${score} to this week's board. Your all-time best of ${best.get('score')} still stands.`;
+        return `Your best of ${best.get('score')} still stands.`;
       });
       return res.json({ success: true, result });
     } catch (error) {
@@ -205,27 +216,30 @@ exports.getTopScores = runtime.https.onRequest((req, res) =>
     if (rateLimited('getTopScores', req, res)) return undefined;
     if (req.method !== 'GET') return fail(res, 405, 'Use GET.');
     const mode = (req.query && req.query.mode) || DEFAULT_MODE;
+    const period = (req.query && req.query.period) || 'all';
     if (!MODES.includes(mode)) return fail(res, 400, 'Unknown mode.');
+    if (!PERIODS.includes(period)) return fail(res, 400, 'Unknown period.');
 
     try {
       // Each uncached load costs LEADERBOARD_SIZE reads, so serve repeats from memory.
-      const cached = leaderboardCache.get(mode);
+      const week = isoWeek();
+      const cacheKey = period === 'week' ? `${mode}:${week}` : mode;
+      const cached = leaderboardCache.get(cacheKey);
       let users;
       if (cached && Date.now() - cached.at < LEADERBOARD_CACHE_MS) {
         users = cached.users;
       } else {
-        // Needs the (mode, score desc) composite index in firestore.indexes.json.
-        const snapshot = await db
-          .collection(SCORES)
-          .where('mode', '==', mode)
-          .orderBy('score', 'desc')
-          .limit(LEADERBOARD_SIZE)
-          .get();
+        // Need the (mode, score desc) and (mode, week, score desc) composite indexes in firestore.indexes.json.
+        const query =
+          period === 'week'
+            ? db.collection(WEEKLY_SCORES).where('mode', '==', mode).where('week', '==', week)
+            : db.collection(SCORES).where('mode', '==', mode);
+        const snapshot = await query.orderBy('score', 'desc').limit(LEADERBOARD_SIZE).get();
         users = snapshot.docs.map(doc => ({
           username: doc.get('username'),
           score: doc.get('score')
         }));
-        leaderboardCache.set(mode, { users, at: Date.now() });
+        leaderboardCache.set(cacheKey, { users, at: Date.now() });
       }
       res.set('Cache-Control', 'public, max-age=30');
       return res.json({ users });

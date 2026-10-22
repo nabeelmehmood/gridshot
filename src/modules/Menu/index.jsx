@@ -8,12 +8,13 @@ import {
   streakMultiplier
 } from '../../game/scoring';
 import { MODE_IDS, MODES } from '../../game/modes';
-import { bestRunOf, PHASES } from '../../game/state';
+import { PRACTICE_OPTIONS } from '../../game/practice';
+import { avgHitMs, bestRunOf, PHASES } from '../../game/state';
 import { cleanName } from '../../game/username';
 import { track } from '../../analytics';
 import { hasFinePointer } from '../../device';
 import { readStored, writeStored } from '../../storage';
-import { THEME_IDS, THEMES } from '../../themes';
+import { TARGET_COLORS, THEME_IDS, THEMES } from '../../themes';
 import { DEFAULT_SETTINGS, SETTING_LIMITS, useGame } from '../Context';
 import { Crosshair, CROSSHAIR_STYLES } from '../Crosshair';
 import Leaderboard from '../Leaderboard';
@@ -39,7 +40,7 @@ export default function Menu() {
   const [step, setStep] = useState(() =>
     !hasPointer || readStored('onboarded', isBoolean, false) ? null : STEPS[0]
   );
-  const [open, setOpen] = useState({ mode: false, theme: false, crosshair: false });
+  const [open, setOpen] = useState({ mode: false, theme: false, crosshair: false, practice: false });
   const [peek, setPeek] = useState(false);
 
   const finishOnboarding = () => {
@@ -111,6 +112,17 @@ export default function Menu() {
               dimmed={Boolean(step)}
             >
               <CrosshairPicker />
+            </Collapsible>
+          )}
+          {hasPointer && (
+            <Collapsible
+              title="Practice"
+              summary={<PracticeSummary practice={settings.practice} />}
+              open={step ? false : open.practice}
+              onToggle={step ? undefined : toggle('practice')}
+              dimmed={Boolean(step)}
+            >
+              <PracticePicker />
             </Collapsible>
           )}
         </div>
@@ -186,7 +198,8 @@ function Collapsible({ title, summary, open, onToggle, active, dimmed, children 
 }
 
 function MainCard({ onOpenLeaderboard, guide, dimmed, onStarted }) {
-  const { game, leaderboardFor, loadLeaderboard, lockError, requestStart } = useGame();
+  const { game, leaderboardFor, loadLeaderboard, lockError, requestStart, settings } = useGame();
+  const practice = settings.practice.enabled;
   const finished = game.phase === PHASES.FINISHED;
   const bestRun = bestRunOf(game);
   const canSave = finished && bestRun?.runId && !bestRun.saved && bestRun.score > 0;
@@ -237,7 +250,10 @@ function MainCard({ onOpenLeaderboard, guide, dimmed, onStarted }) {
       {!hasPointer && <PlayOnComputer />}
 
       <p className={styles.currentMode}>
-        <span className={styles.currentModeName}>{mode.name}</span>
+        <span className={styles.currentModeName}>
+          {mode.name}
+          {practice && <span className={styles.practiceBadge}>Practice</span>}
+        </span>
         {mode.description}
       </p>
 
@@ -263,7 +279,7 @@ function MainCard({ onOpenLeaderboard, guide, dimmed, onStarted }) {
       {hasPointer && (
         <>
           <button type="button" className={`${styles.startButton} ${startStep ? styles.pulse : ''}`} onClick={start} autoFocus>
-            {finished ? 'Play again' : 'Start'}
+            {practice ? (finished ? 'Practice again' : 'Start practice') : finished ? 'Play again' : 'Start'}
           </button>
           <ScoringRules mode={mode} />
         </>
@@ -477,15 +493,41 @@ function ThemeBadge({ colors: [top, wave, bottom] }) {
   );
 }
 
+// Counts up from 0 to `target` with an ease-out; reduced-motion players see the final number at once.
+const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+
+function useCountUp(target, duration = 900) {
+  const [shown, setShown] = useState(() => (prefersReducedMotion() ? target : 0));
+  useEffect(() => {
+    if (prefersReducedMotion()) return undefined;
+    let frame;
+    const startedAt = performance.now();
+    const step = now => {
+      const progress = Math.min(1, (now - startedAt) / duration);
+      setShown(Math.round(target * (1 - (1 - progress) ** 3)));
+      if (progress < 1) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [target, duration]);
+  return shown;
+}
+
 function Results({ game }) {
-  const { mode, hits, clicks, expired, bonus, bestStreak, elapsed, newBest, completed } = game;
+  const { mode, hits, clicks, expired, bonus, bestStreak, elapsed, newBest, completed, practice } = game;
   const { expiredLabel, untimed, name } = MODES[mode];
   const score = calculateScore(hits, clicks, expired, bonus);
+  const shown = useCountUp(score);
+  const hitMs = avgHitMs(game);
   return (
     <section className={styles.results} aria-label="Run results">
       <div className={styles.scoreBlock}>
-        <span className={styles.scoreValue}>{score}</span>
-        <span className={styles.scoreLabel}>{newBest ? 'New personal best!' : 'Score'}</span>
+        <span className={`${styles.scoreValue} ${shown === score ? styles.counted : ''}`} aria-label={String(score)}>
+          {shown}
+        </span>
+        <span className={styles.scoreLabel}>
+          {practice ? 'Practice score' : newBest ? 'New personal best!' : 'Score'}
+        </span>
       </div>
       <dl className={styles.statGrid}>
         <Stat label="Hits" value={hits} />
@@ -495,8 +537,15 @@ function Results({ game }) {
         <Stat label="Accuracy" value={formatAccuracy(hits, clicks)} />
         <Stat label="Best streak" value={bestStreak} />
         <Stat label="Streak bonus" value={`+${bonus}`} />
+        <Stat label="Time per hit" value={hitMs === null ? '–' : `${Math.round(hitMs)}ms`} />
       </dl>
-      {completed && score > 0 && (
+      {practice && (
+        <p className={styles.practiceNote}>
+          Practice run: {practice.duration}s, {practice.size}× targets, {practice.speed}× speed. Not saved to your stats
+          or the leaderboard.
+        </p>
+      )}
+      {completed && !practice && score > 0 && (
         <div className={styles.shareScore}>
           <span className={styles.shareScoreLabel}>Share your score</span>
           <ShareButtons text={scoreShareText(score, name)} where="results" />
@@ -525,12 +574,18 @@ function Settings() {
     setSettings(current => ({ ...current, [key]: value }));
   };
   const toggle = key => event => setSettings(current => ({ ...current, [key]: event.target.checked }));
-  // The theme and crosshair have their own cards, so resetting settings leaves them alone.
+  // Theme, crosshair and practice have their own cards, so resetting settings leaves them alone.
+  const OWN_CARDS = ['theme', 'crosshair', 'practice'];
   const isDefault = Object.keys(DEFAULT_SETTINGS).every(
-    key => key === 'theme' || key === 'crosshair' || settings[key] === DEFAULT_SETTINGS[key]
+    key => OWN_CARDS.includes(key) || settings[key] === DEFAULT_SETTINGS[key]
   );
   const reset = () =>
-    setSettings(current => ({ ...DEFAULT_SETTINGS, theme: current.theme, crosshair: current.crosshair }));
+    setSettings(current => ({
+      ...DEFAULT_SETTINGS,
+      theme: current.theme,
+      crosshair: current.crosshair,
+      practice: current.practice
+    }));
 
   return (
     <section className={styles.settings}>
@@ -570,6 +625,29 @@ function Settings() {
         <input type="checkbox" checked={settings.customCursor} onChange={toggle('customCursor')} />
         Animated cursor
       </label>
+      <fieldset className={styles.targetColors}>
+        <legend className={styles.fieldLegend}>Target colour</legend>
+        <div className={styles.crosshairColors}>
+          {TARGET_COLORS.map(({ id, label }) => (
+            <label
+              key={id}
+              className={id === 'theme' ? styles.themeColorOption : styles.colorSwatch}
+              style={id === 'theme' ? undefined : { background: id }}
+              title={label}
+            >
+              <input
+                type="radio"
+                name="target-color"
+                value={id}
+                checked={settings.targetColor === id}
+                onChange={() => setSettings(current => ({ ...current, targetColor: id }))}
+              />
+              {id === 'theme' ? label : <span className={styles.srOnly}>{label}</span>}
+            </label>
+          ))}
+        </div>
+        <p className={styles.fieldHint}>High-contrast colours that don't rely on telling red from green.</p>
+      </fieldset>
       <button
         type="button"
         className={styles.linkButton}
@@ -680,6 +758,56 @@ function CrosshairPicker() {
       >
         Reset crosshair
       </button>
+    </div>
+  );
+}
+
+const PRACTICE_LABELS = {
+  duration: { title: 'Length', format: value => `${value}s` },
+  size: { title: 'Target size', format: value => `${value}×` },
+  speed: { title: 'Speed', format: value => `${value}×` }
+};
+
+function PracticeSummary({ practice }) {
+  if (!practice.enabled) return 'Off';
+  return `${practice.duration}s · ${practice.size}× · ${practice.speed}×`;
+}
+
+// Practice: pick a length, target size and speed for any mode. Runs aren't saved anywhere.
+function PracticePicker() {
+  const { settings, setSettings } = useGame();
+  const practice = settings.practice;
+  const set = patch => setSettings(current => ({ ...current, practice: { ...current.practice, ...patch } }));
+
+  return (
+    <div className={styles.practicePicker}>
+      <label className={styles.toggle}>
+        <input type="checkbox" checked={practice.enabled} onChange={event => set({ enabled: event.target.checked })} />
+        Practice mode
+      </label>
+      <p className={styles.fieldHint}>
+        Tune any mode to warm up or drill a weakness. Practice runs don't count towards your stats, bests or the
+        leaderboard. Length applies to timed modes.
+      </p>
+      {Object.entries(PRACTICE_OPTIONS).map(([key, options]) => (
+        <fieldset key={key} className={styles.segmentGroup} disabled={!practice.enabled}>
+          <legend className={styles.fieldLegend}>{PRACTICE_LABELS[key].title}</legend>
+          <div className={styles.segments}>
+            {options.map(option => (
+              <label key={option} className={styles.segment}>
+                <input
+                  type="radio"
+                  name={`practice-${key}`}
+                  value={option}
+                  checked={practice[key] === option}
+                  onChange={() => set({ [key]: option })}
+                />
+                {PRACTICE_LABELS[key].format(option)}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      ))}
     </div>
   );
 }

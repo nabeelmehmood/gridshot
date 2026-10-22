@@ -5,7 +5,7 @@ import { MODES } from '../../game/modes';
 import { PHASES } from '../../game/state';
 import { hideBootLoader } from '../../bootLoader';
 import { playShot } from '../../sound';
-import { THEMES } from '../../themes';
+import { targetLook, THEMES } from '../../themes';
 import { useGame } from '../Context';
 import Backdrop from './Backdrop';
 import { Ambient, Effects } from './Effects';
@@ -20,7 +20,7 @@ const TARGET_PLANE_Z = -8;
 
 // Shots are raycast from the crosshair on mousedown, which is how aim trainers register clicks.
 // The sound plays here rather than after the state update so it lands on the same frame as the click.
-function Shooter({ targetsRef, environmentRef, effectsRef, onShot, volume, theme, radius, effects, running }) {
+function Shooter({ targetsRef, environmentRef, effectsRef, onShot, volume, theme, hitColor, radius, effects, running }) {
   const camera = useThree(state => state.camera);
   const domElement = useThree(state => state.gl.domElement);
 
@@ -54,7 +54,7 @@ function Shooter({ targetsRef, environmentRef, effectsRef, onShot, volume, theme
       playShot(Boolean(hit), volume);
       if (effects && effectsRef.current) {
         if (hit) {
-          effectsRef.current.hit(hit.object.getWorldPosition(worldPosition), theme.targetColor, radius, camera.position);
+          effectsRef.current.hit(hit.object.getWorldPosition(worldPosition), hitColor, radius, camera.position);
         } else if (environmentRef.current) {
           showMiss();
         }
@@ -63,7 +63,7 @@ function Shooter({ targetsRef, environmentRef, effectsRef, onShot, volume, theme
     };
     document.addEventListener('mousedown', handleMouseDown);
     return () => document.removeEventListener('mousedown', handleMouseDown);
-  }, [camera, domElement, effects, effectsRef, environmentRef, onShot, radius, running, targetsRef, theme, volume]);
+  }, [camera, domElement, effects, effectsRef, environmentRef, hitColor, onShot, radius, running, targetsRef, theme, volume]);
 
   return null;
 }
@@ -88,6 +88,10 @@ export default function Scene() {
   const effectsRef = useRef(null);
   const theme = THEMES[settings.theme];
   const Environment = ENVIRONMENTS[settings.theme];
+  const look = targetLook(theme, settings.targetColor);
+  // Practice runs scale target size and how fast everything moves.
+  const size = game.practice?.size ?? 1;
+  const speed = game.practice?.speed ?? 1;
 
   return (
     <Canvas shadows camera={{ position: [0, 4, 5], fov: settings.fov }} style={{ position: 'fixed', inset: 0 }}>
@@ -103,11 +107,13 @@ export default function Scene() {
         // The run spawns fresh targets, so the old ones are hidden from the glide in until it starts.
         visible={view === 'menu' || game.phase === PHASES.RUNNING}
         onExpire={expire}
-        color={theme.targetColor}
-        outline={theme.outline}
-        style={theme.targetStyle}
+        color={look.color}
+        outline={look.outline}
+        style={look.style}
+        size={size}
+        speed={speed}
         halo={settings.effects && Boolean(theme.halo)}
-        haloColor={theme.haloColor}
+        haloColor={look.haloColor}
       />
       {settings.effects && theme.ambient && <Ambient key={theme.ambient} preset={theme.ambient} />}
       <Effects ref={effectsRef} />
@@ -128,7 +134,8 @@ export default function Scene() {
         onShot={shoot}
         volume={settings.volume}
         theme={theme}
-        radius={MODES[game.mode].radius}
+        hitColor={look.color}
+        radius={MODES[game.mode].radius * size}
         effects={settings.effects}
         running={game.phase === PHASES.RUNNING}
       />
