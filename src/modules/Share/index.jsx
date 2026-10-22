@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { track } from '../../analytics';
+import { promptInstall, useCanInstall } from '../../install';
 import { MODES } from '../../game/modes';
 import { THEMES } from '../../themes';
 import { useGame } from '../Context';
@@ -111,6 +112,7 @@ export function scoreShareText(score, modeName) {
 
 export function ShareAndFeedback() {
   const { game, settings } = useGame();
+  const canInstall = useCanInstall();
   const gameInfo = `${MODES[game.mode].name} · ${THEMES[settings.theme].name} · ${browserSummary()}`;
   return (
     <div className={styles.shareAndFeedback}>
@@ -120,6 +122,19 @@ export function ShareAndFeedback() {
         </h3>
         <ShareButtons />
       </section>
+      {canInstall && (
+        <section aria-labelledby="install-title" className={styles.section}>
+          <h3 id="install-title" className={styles.heading}>
+            Install Gridshot
+          </h3>
+          <p className={styles.text}>Open it from your desktop or taskbar, in its own window, before a session.</p>
+          <div className={styles.shareRow}>
+            <button type="button" className={`${styles.pill} ${styles.primary}`} onClick={promptInstall}>
+              Install app
+            </button>
+          </div>
+        </section>
+      )}
       <section aria-labelledby="feedback-title" className={styles.section}>
         <h3 id="feedback-title" className={styles.heading}>
           Feedback

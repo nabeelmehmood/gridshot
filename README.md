@@ -145,5 +145,75 @@ firebase deploy --only functions,firestore:indexes
 npm run deploy
 ```
 
-Scores live in the `LeaderboardScores` collection and tokens in `Runs`. The old `UserScores`
-collection (the pre-validation leaderboard) is no longer read.
+Scores live in the `LeaderboardScores` collection (each player's best per mode), weekly bests in
+`WeeklyScores`, and tokens in `Runs`. The old `UserScores` collection (the pre-validation
+leaderboard) is no longer read.
+
+### Removing a leaderboard entry
+
+For an offensive name, an impossible score, or a test entry. The script runs on your machine with
+your Firebase CLI login, so there's no admin page or endpoint on the live site for anyone to abuse.
+
+**Before you start**
+
+- Run it from the repo folder (`F:\Work\gridshot`).
+- You need to be logged in to the Firebase CLI as the project owner. Check with
+  `npx firebase login:list`; if nothing is listed, run `npx firebase login`.
+
+**Usage**
+
+```bash
+npm run remove-score -- <name> [mode]
+```
+
+The `--` is needed: it passes what follows to the script instead of to npm.
+
+| Example | Removes |
+|---|---|
+| `npm run remove-score -- xXcheaterXx` | that name from every mode, both the all-time and this week's board |
+| `npm run remove-score -- xXcheaterXx skeet` | that name from Skeet only (all-time and this week) |
+
+- **Names aren't case-sensitive:** `Nabeel`, `nabeel` and `NABEEL` are the same player, like on the
+  server.
+- **Modes** are the ids `gridshot`, `strafe`, `popin`, `skeet`, `spidershot`, `microshot`, `bounce`
+  and `survival`. A wrong mode or a missing name prints the usage line and deletes nothing.
+- **It doesn't ask "are you sure?"**, so check the name first. There's no undo. The player can
+  simply save a new score again.
+
+**What you'll see**
+
+```text
+Removing "xXcheaterXx" from skeet (all-time and 2026-W43):
+  removed LeaderboardScores/skeet_xxcheaterxx
+  removed WeeklyScores/skeet_2026-W43_xxcheaterxx
+```
+
+`removed` is also printed for modes where the name had no entry; deleting something that isn't
+there is harmless. `FAILED` lines show Firebase's error, usually a login problem (see above).
+
+**Good to know**
+
+- **Up to 30 seconds' delay.** The leaderboard function keeps each board in memory for 30 seconds,
+  so the name can still show briefly. Reload after that.
+- **This week only.** It removes the entry from the current week's board (weeks start Monday
+  00:00 UTC). Past weeks are never shown, so they don't matter.
+- **It doesn't block the name.** To stop a word being used at all, add it to the profanity filter
+  with `profanity.addWords('word')` right after `new Filter()` in both `src/game/username.js` and
+  `functions/index.js`, then redeploy the functions and the site.
+- **Clearing everything** (for example after a scoring change) is a different job. Use
+  `firebase firestore:delete <collection> --recursive --project gridshot-bbd16` on
+  `LeaderboardScores`, `WeeklyScores` and `Runs`.
+
+The script is `scripts/remove-score.mjs`. It reads the mode list from `functions/index.js`, so a
+new mode is picked up automatically.
+
+## Analytics
+
+Visits and a handful of game events (runs started, finished and abandoned, saves, shares) go to
+[Umami Cloud](https://umami.is), which is cookieless, so there's no consent banner. Everything goes
+through `track()` in `src/analytics.js`; on localhost events are only logged to the console.
+
+## Installing
+
+On Chrome and Edge the menu offers **Install app**. `public/sw.js` loads pages from the network
+first (so deploys show up straight away) and serves the hashed files in `assets/` from its cache.

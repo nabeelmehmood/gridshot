@@ -20,7 +20,7 @@ const TARGET_PLANE_Z = -8;
 
 // Shots are raycast from the crosshair on mousedown, which is how aim trainers register clicks.
 // The sound plays here rather than after the state update so it lands on the same frame as the click.
-function Shooter({ targetsRef, environmentRef, effectsRef, onShot, volume, theme, hitColor, radius, effects, running }) {
+function Shooter({ targetsRef, environmentRef, effectsRef, onShot, volume, missVolume, theme, hitColor, radius, effects, running }) {
   const camera = useThree(state => state.camera);
   const domElement = useThree(state => state.gl.domElement);
 
@@ -51,7 +51,7 @@ function Shooter({ targetsRef, environmentRef, effectsRef, onShot, volume, theme
       const hit = raycaster
         .intersectObjects(targetsRef.current.children, true)
         .find(intersection => intersection.object.userData.targetKey !== undefined);
-      playShot(Boolean(hit), volume);
+      playShot(Boolean(hit), volume, missVolume);
       if (effects && effectsRef.current) {
         if (hit) {
           effectsRef.current.hit(hit.object.getWorldPosition(worldPosition), hitColor, radius, camera.position);
@@ -63,7 +63,7 @@ function Shooter({ targetsRef, environmentRef, effectsRef, onShot, volume, theme
     };
     document.addEventListener('mousedown', handleMouseDown);
     return () => document.removeEventListener('mousedown', handleMouseDown);
-  }, [camera, domElement, effects, effectsRef, environmentRef, hitColor, onShot, radius, running, targetsRef, theme, volume]);
+  }, [camera, domElement, effects, effectsRef, environmentRef, hitColor, missVolume, onShot, radius, running, targetsRef, theme, volume]);
 
   return null;
 }
@@ -122,6 +122,7 @@ export default function Scene() {
         controlsRef={controlsRef}
         sensitivity={settings.sensitivity}
         fov={settings.fov}
+        reduceMotion={settings.reduceMotion}
         onEnterStart={beginEntering}
         onEntered={enterGame}
         onLeave={leaveGame}
@@ -132,7 +133,8 @@ export default function Scene() {
         environmentRef={environmentRef}
         effectsRef={effectsRef}
         onShot={shoot}
-        volume={settings.volume}
+        volume={settings.muted ? 0 : settings.volume}
+        missVolume={settings.muted ? 0 : settings.missVolume}
         theme={theme}
         hitColor={look.color}
         radius={MODES[game.mode].radius * size}

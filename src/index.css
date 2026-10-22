@@ -84,3 +84,27 @@ button:disabled {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* Reduce motion (Settings, defaults to the OS preference): animations jump to their end state. */
+:root[data-reduce-motion='true'] *,
+:root[data-reduce-motion='true'] *::before,
+:root[data-reduce-motion='true'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+
+.soundToast {
+  position: fixed;
+  left: 50%;
+  bottom: 56px;
+  z-index: 5;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  background: var(--panel);
+  font-size: 14px;
+  font-weight: 600;
+  pointer-events: none;
+}

@@ -35,9 +35,11 @@ function blip(ctx, { type, from, to, duration, gain }) {
   osc.stop(now + duration + 0.02);
 }
 
-export function playShot(hit, volume) {
+// Hits and misses have their own levels, so the miss thud can be turned down or off on its own.
+export function playShot(hit, hitVolume, missVolume) {
   streak = hit ? streak + 1 : 0;
   const ctx = audio();
+  const volume = hit ? hitVolume : missVolume;
   if (!ctx || volume <= 0 || ctx.state !== 'running') return;
 
   if (hit) {

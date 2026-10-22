@@ -20,7 +20,8 @@
     "lint": "eslint .",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",
-    "assets": "node scripts/generate-assets.mjs"
+    "assets": "node scripts/generate-assets.mjs",
+    "remove-score": "node scripts/remove-score.mjs"
   },
   "dependencies": {
     "@react-three/fiber": "^9.8.2",

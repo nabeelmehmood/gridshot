@@ -496,10 +496,10 @@ function ThemeBadge({ colors: [top, wave, bottom] }) {
 // Counts up from 0 to `target` with an ease-out; reduced-motion players see the final number at once.
 const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
-function useCountUp(target, duration = 900) {
-  const [shown, setShown] = useState(() => (prefersReducedMotion() ? target : 0));
+function useCountUp(target, still, duration = 900) {
+  const [shown, setShown] = useState(() => (still || prefersReducedMotion() ? target : 0));
   useEffect(() => {
-    if (prefersReducedMotion()) return undefined;
+    if (still || prefersReducedMotion()) return undefined;
     let frame;
     const startedAt = performance.now();
     const step = now => {
@@ -509,7 +509,7 @@ function useCountUp(target, duration = 900) {
     };
     frame = requestAnimationFrame(step);
     return () => cancelAnimationFrame(frame);
-  }, [target, duration]);
+  }, [target, still, duration]);
   return shown;
 }
 
@@ -517,7 +517,8 @@ function Results({ game }) {
   const { mode, hits, clicks, expired, bonus, bestStreak, elapsed, newBest, completed, practice } = game;
   const { expiredLabel, untimed, name } = MODES[mode];
   const score = calculateScore(hits, clicks, expired, bonus);
-  const shown = useCountUp(score);
+  const { settings } = useGame();
+  const shown = useCountUp(score, settings.reduceMotion);
   const hitMs = avgHitMs(game);
   return (
     <section className={styles.results} aria-label="Run results">
@@ -611,12 +612,24 @@ function Settings() {
       />
       <Slider
         id="volume"
-        label="Hit sounds"
+        label="Hit sound"
         value={settings.volume}
         display={settings.volume === 0 ? 'Off' : `${Math.round(settings.volume * 100)}%`}
         onChange={update('volume')}
         {...SETTING_LIMITS.volume}
       />
+      <Slider
+        id="miss-volume"
+        label="Miss sound"
+        value={settings.missVolume}
+        display={settings.missVolume === 0 ? 'Off' : `${Math.round(settings.missVolume * 100)}%`}
+        onChange={update('missVolume')}
+        {...SETTING_LIMITS.volume}
+      />
+      <label className={styles.toggle}>
+        <input type="checkbox" checked={settings.muted} onChange={toggle('muted')} />
+        Mute all sounds (press M any time)
+      </label>
       <label className={styles.toggle}>
         <input type="checkbox" checked={settings.effects} onChange={toggle('effects')} />
         Particles and effects
@@ -624,6 +637,10 @@ function Settings() {
       <label className={styles.toggle}>
         <input type="checkbox" checked={settings.customCursor} onChange={toggle('customCursor')} />
         Animated cursor
+      </label>
+      <label className={styles.toggle}>
+        <input type="checkbox" checked={settings.reduceMotion} onChange={toggle('reduceMotion')} />
+        Reduce motion (no camera glide or drifting, calmer animations)
       </label>
       <fieldset className={styles.targetColors}>
         <legend className={styles.fieldLegend}>Target colour</legend>

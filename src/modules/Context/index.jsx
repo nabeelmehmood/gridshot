@@ -10,10 +10,18 @@ import { readStored, writeStored } from '../../storage';
 import { DEFAULT_THEME, TARGET_COLORS, THEMES } from '../../themes';
 import { CROSSHAIR_STYLES } from '../Crosshair';
 
+const prefersReducedMotion =
+  typeof window !== 'undefined' && (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
+
 export const DEFAULT_SETTINGS = {
   sensitivity: 1,
   fov: 75,
+  // volume is the hit sound (and countdown); misses have their own level. M toggles muted.
   volume: 0.6,
+  missVolume: 0.6,
+  muted: false,
+  // Skips the camera glide and menu drift and stills UI animations. Follows the OS setting by default.
+  reduceMotion: prefersReducedMotion,
   theme: DEFAULT_THEME,
   effects: true,
   rawInput: false,
@@ -95,6 +103,9 @@ const loadSettings = () => ({
   sensitivity: readStored('lookSensitivity', inRange('sensitivity'), DEFAULT_SETTINGS.sensitivity),
   fov: readStored('fov', inRange('fov'), DEFAULT_SETTINGS.fov),
   volume: readStored('volume', inRange('volume'), DEFAULT_SETTINGS.volume),
+  missVolume: readStored('missVolume', inRange('volume'), DEFAULT_SETTINGS.missVolume),
+  muted: readStored('muted', value => typeof value === 'boolean', DEFAULT_SETTINGS.muted),
+  reduceMotion: readStored('reduceMotion', value => typeof value === 'boolean', DEFAULT_SETTINGS.reduceMotion),
   theme: readStored('theme', value => Boolean(THEMES[value]), DEFAULT_SETTINGS.theme),
   effects: readStored('effects', value => typeof value === 'boolean', DEFAULT_SETTINGS.effects),
   rawInput: readStored('rawInput', value => typeof value === 'boolean', DEFAULT_SETTINGS.rawInput),
@@ -170,6 +181,9 @@ export function GameContextProvider({ children }) {
     writeStored('rawInput', settings.rawInput);
     writeStored('fov', settings.fov);
     writeStored('volume', settings.volume);
+    writeStored('missVolume', settings.missVolume);
+    writeStored('muted', settings.muted);
+    writeStored('reduceMotion', settings.reduceMotion);
     writeStored('theme', settings.theme);
     writeStored('effects', settings.effects);
     writeStored('crosshair', settings.crosshair);
@@ -282,11 +296,12 @@ export function GameContextProvider({ children }) {
   const [view, setView] = useState('menu');
   const [countdown, setCountdown] = useState(0);
   const beginEntering = useCallback(() => setView('entering'), []);
+  const hitVolume = settings.muted ? 0 : settings.volume;
   const enterGame = useCallback(() => {
     setView('game');
     setCountdown(COUNTDOWN_FROM);
-    playCountdown(false, settings.volume);
-  }, [settings.volume]);
+    playCountdown(false, hitVolume);
+  }, [hitVolume]);
   const leaveGame = useCallback(() => {
     setView('menu');
     setCountdown(0);
@@ -298,15 +313,15 @@ export function GameContextProvider({ children }) {
     const timer = setTimeout(() => {
       if (countdown > 1) {
         setCountdown(countdown - 1);
-        playCountdown(false, settings.volume);
+        playCountdown(false, hitVolume);
       } else {
         setCountdown(0);
-        playCountdown(true, settings.volume);
+        playCountdown(true, hitVolume);
         startRun();
       }
     }, COUNTDOWN_STEP_MS);
     return () => clearTimeout(timer);
-  }, [countdown, settings.volume, startRun]);
+  }, [countdown, hitVolume, startRun]);
   const shoot = useCallback(
     targetKey => dispatch({ type: 'shot', targetKey, rolls: newRolls(), at: performance.now() }),
     []

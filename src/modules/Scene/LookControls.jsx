@@ -14,9 +14,6 @@ const MENU_TARGET = new Vector3(0, 4, -8);
 const ENTER_SECONDS = 0.75;
 const LEAVE_SECONDS = 0.9;
 
-const reducedMotion =
-  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
 const _matrix = new Matrix4();
 const _up = new Vector3(0, 1, 0);
 const _targetPosition = new Vector3();
@@ -27,11 +24,14 @@ const easeInOut = t => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 // Narrow (portrait) screens see far less width, so the menu camera backs off to keep the board in view.
 const MENU_FIT_ASPECT = 1.3;
 
-function menuPose(time, aspect, position, quaternion) {
+// With reduced motion the menu camera holds still instead of drifting.
+function menuPose(time, aspect, position, quaternion, still = false) {
   const pullBack = Math.max(1, MENU_FIT_ASPECT / aspect);
   position.copy(MENU_POSITION).sub(MENU_TARGET).multiplyScalar(pullBack).add(MENU_TARGET);
-  position.x += Math.sin(time * 0.15) * 1.2;
-  position.y += Math.sin(time * 0.23) * 0.3;
+  if (!still) {
+    position.x += Math.sin(time * 0.15) * 1.2;
+    position.y += Math.sin(time * 0.23) * 0.3;
+  }
   quaternion.setFromRotationMatrix(_matrix.lookAt(position, MENU_TARGET, _up));
 }
 
@@ -45,7 +45,16 @@ function pointerSpeedFor(sensitivity, fov, height) {
 
 // Owns the camera: the menu drift, the glide into the game once the pointer locks (the run starts
 // only when the camera arrives), and the glide back out when it unlocks.
-export default function LookControls({ controlsRef, sensitivity, fov, onEnterStart, onEntered, onLeave, onLockError }) {
+export default function LookControls({
+  controlsRef,
+  sensitivity,
+  fov,
+  reduceMotion,
+  onEnterStart,
+  onEntered,
+  onLeave,
+  onLockError
+}) {
   const get = useThree(state => state.get);
   const height = useThree(state => state.size.height);
   // Lets a rebuilt controls object start at the current speed without rebuilding on every change,
@@ -53,10 +62,16 @@ export default function LookControls({ controlsRef, sensitivity, fov, onEnterSta
   const pointerSpeed = useRef(1);
   const transition = useRef({ mode: 'menu', t: 0, fromPosition: new Vector3(), fromQuaternion: new Quaternion() });
   const entered = useRef(onEntered);
+  // Read inside the controls' event handlers, so changing it doesn't rebuild the controls mid-run.
+  const still = useRef(reduceMotion);
 
   useEffect(() => {
     entered.current = onEntered;
   }, [onEntered]);
+
+  useEffect(() => {
+    still.current = reduceMotion;
+  }, [reduceMotion]);
 
   useEffect(() => {
     const { camera, gl } = get();
@@ -75,7 +90,7 @@ export default function LookControls({ controlsRef, sensitivity, fov, onEnterSta
 
     const handleLock = () => {
       onEnterStart();
-      if (reducedMotion) {
+      if (still.current) {
         camera.position.copy(GAME_POSITION);
         camera.quaternion.copy(GAME_QUATERNION);
         transition.current.mode = 'game';
@@ -90,6 +105,10 @@ export default function LookControls({ controlsRef, sensitivity, fov, onEnterSta
     const handleUnlock = () => {
       controls.enabled = false;
       onLeave();
+      if (still.current) {
+        transition.current.mode = 'menu';
+        return;
+      }
       begin('leaving');
     };
 
@@ -113,7 +132,7 @@ export default function LookControls({ controlsRef, sensitivity, fov, onEnterSta
     if (current.mode === 'game') return;
 
     if (current.mode === 'menu') {
-      menuPose(clock.elapsedTime, camera.aspect, camera.position, camera.quaternion);
+      menuPose(clock.elapsedTime, camera.aspect, camera.position, camera.quaternion, still.current);
       return;
     }
 
@@ -123,7 +142,7 @@ export default function LookControls({ controlsRef, sensitivity, fov, onEnterSta
       _targetPosition.copy(GAME_POSITION);
       _targetQuaternion.copy(GAME_QUATERNION);
     } else {
-      menuPose(clock.elapsedTime, camera.aspect, _targetPosition, _targetQuaternion);
+      menuPose(clock.elapsedTime, camera.aspect, _targetPosition, _targetQuaternion, still.current);
     }
     const eased = easeInOut(current.t);
     camera.position.lerpVectors(current.fromPosition, _targetPosition, eased);
