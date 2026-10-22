@@ -84,7 +84,8 @@ const LEADERBOARD_CACHE_MS = 30 * 1000;
 // function is capped at MAX_INSTANCES and rate limited per minute before touching Firestore.
 // Worst case under a sustained flood is a few dollars a month instead of unbounded.
 const MAX_INSTANCES = 2;
-const runtime = functions.runWith({ maxInstances: MAX_INSTANCES, memory: '128MB', timeoutSeconds: 10 });
+// 128MB ran out of memory with firebase-admin loaded (seen in the logs on 2026-10-21).
+const runtime = functions.runWith({ maxInstances: MAX_INSTANCES, memory: '256MB', timeoutSeconds: 10 });
 
 // A run takes 60s, so 5 starts/min per player leaves room for restarts after Esc.
 const limits = {
@@ -252,7 +253,7 @@ exports.getTopScores = runtime.https.onRequest((req, res) =>
 
 // Connected to a Cloud Billing budget; disables billing once spend reaches the budget (see README).
 exports.stopBilling = functions
-  .runWith({ maxInstances: 1, memory: '128MB', timeoutSeconds: 30 })
+  .runWith({ maxInstances: 1, memory: '256MB', timeoutSeconds: 30 })
   .pubsub.topic(KILL_SWITCH_TOPIC)
   .onPublish(async message => {
     let notification = null;

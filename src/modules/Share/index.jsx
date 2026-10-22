@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { track } from '../../analytics';
 import { MODES } from '../../game/modes';
 import { THEMES } from '../../themes';
-import { ConsentToggle } from '../Consent';
 import { useGame } from '../Context';
 import styles from './index.module.css';
 
@@ -148,7 +147,7 @@ export function ShareAndFeedback() {
             Report a bug
           </a>
         </div>
-        <ConsentToggle />
+        <p className={styles.privacy}>Visits are counted anonymously with Umami: no cookies, nothing personal.</p>
       </section>
     </div>
   );

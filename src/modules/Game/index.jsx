@@ -1,5 +1,4 @@
 import { useEffect } from 'react';
-import ConsentBanner from '../Consent';
 import Cursor from '../Cursor';
 import Hud, { Countdown } from '../Hud';
 import Menu from '../Menu';
@@ -22,7 +21,6 @@ export default function Game() {
       {settings.effects && <div className="vignette" aria-hidden="true" />}
       {/* Nothing overlays the scene while the camera glides in. */}
       {game.phase === PHASES.RUNNING ? <Hud /> : view === 'menu' && <Menu />}
-      {view === 'menu' && game.phase !== PHASES.RUNNING && <ConsentBanner />}
       {view === 'game' && countdown > 0 && <Countdown value={countdown} />}
       {/* Menu only: in game the pointer is captured and the crosshair takes over. */}
       {hasFinePointer && settings.customCursor && view === 'menu' && game.phase !== PHASES.RUNNING && (

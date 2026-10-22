@@ -1,56 +1,39 @@
-import { useSyncExternalStore } from 'react';
-import { readStored, writeStored } from './storage';
-
-// GA4 only loads after the player accepts; until then nothing is sent and no cookies are set.
-// index.html queues the config call with consent denied, so accepting just updates consent and
-// loads the tag. Locally events are logged to the console instead.
-const MEASUREMENT_ID = 'G-QTXSEFZPY1';
-const CONSENT_KEY = 'analyticsConsent';
+// Umami Cloud: cookieless and stores nothing personal, so it needs no consent banner. Paste the
+// Website ID from Umami (Settings → Websites → Edit) below; until it's set nothing is sent. Locally,
+// events are logged to the console instead.
+const UMAMI_WEBSITE_ID = '212bfe3a-9174-43c3-941d-8bf9cc786816';
+const UMAMI_SCRIPT = 'https://cloud.umami.is/script.js';
+// Only the live site counts; previews and forks on other hosts are ignored by Umami.
+const SITE_DOMAIN = 'nabeelmehmood.github.io';
 const LOCAL = import.meta.env.DEV || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+const ENABLED = !LOCAL && Boolean(UMAMI_WEBSITE_ID);
 
-const isChoice = value => value === 'granted' || value === 'denied';
-let consent = readStored(CONSENT_KEY, isChoice, null);
-let tagLoaded = false;
-const listeners = new Set();
+// Events fired before the tracker script has loaded wait here.
+const pending = [];
+const MAX_PENDING = 50;
 
-const gtag = (...args) => window.gtag?.(...args);
-
-function loadTag() {
-  if (tagLoaded || LOCAL) return;
-  tagLoaded = true;
-  gtag('consent', 'update', { analytics_storage: 'granted' });
+function loadTracker() {
   const script = document.createElement('script');
-  script.async = true;
-  script.src = `https://www.googletagmanager.com/gtag/js?id=${MEASUREMENT_ID}`;
+  script.defer = true;
+  script.src = UMAMI_SCRIPT;
+  script.dataset.websiteId = UMAMI_WEBSITE_ID;
+  script.dataset.domains = SITE_DOMAIN;
+  script.addEventListener('load', () => pending.splice(0).forEach(([name, data]) => window.umami?.track(name, data)));
   document.head.appendChild(script);
 }
 
-if (consent === 'granted') loadTag();
+if (ENABLED) loadTracker();
 
-export function setConsent(granted) {
-  consent = granted ? 'granted' : 'denied';
-  writeStored(CONSENT_KEY, consent);
-  if (granted) {
-    loadTag();
-  } else if (tagLoaded) {
-    // Already loaded this visit: stop collection now; the tag stays out from the next page load.
-    gtag('consent', 'update', { analytics_storage: 'denied' });
-  }
-  listeners.forEach(listener => listener());
-}
-
-function subscribe(listener) {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
-
-// null until the player picks; 'granted' or 'denied' after.
-export const useConsent = () => useSyncExternalStore(subscribe, () => consent);
+// Umami rejects null values, so missing numbers are left out instead.
+const withoutEmpty = params => Object.fromEntries(Object.entries(params).filter(([, value]) => value != null));
 
 export function track(name, params = {}) {
+  const data = withoutEmpty(params);
   if (LOCAL) {
-    console.debug('[analytics]', name, params);
+    console.debug('[analytics]', name, data);
     return;
   }
-  if (consent === 'granted') gtag('event', name, params);
+  if (!ENABLED) return;
+  if (window.umami) window.umami.track(name, data);
+  else if (pending.length < MAX_PENDING) pending.push([name, data]);
 }

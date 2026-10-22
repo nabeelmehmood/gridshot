@@ -58,3 +58,9 @@
   background: var(--accent);
   filter: brightness(1.08);
 }
+
+.privacy {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
