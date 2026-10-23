@@ -7,10 +7,10 @@ export const POINTS = {
   EXPIRED: -5
 };
 
-// Every STREAK_STEP hits in a row adds +1 to each hit, up to +MAX_STREAK_BONUS (x1.4).
+// Every STREAK_STEP hits in a row adds +1 to each hit, up to +MAX_STREAK_BONUS (x1.5).
 // A miss or an expired target resets the streak. Must match functions/index.js.
 export const STREAK_STEP = 10;
-export const MAX_STREAK_BONUS = 4;
+export const MAX_STREAK_BONUS = 5;
 
 // Extra points for the hit that brings the streak to `streak`.
 export const streakBonus = streak => Math.min(Math.floor(streak / STREAK_STEP), MAX_STREAK_BONUS);

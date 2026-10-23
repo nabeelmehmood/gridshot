@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { AdditiveBlending, BackSide } from 'three';
+import { AdditiveBlending, BackSide, DataTexture, NearestFilter, RedFormat } from 'three';
 import { BOUNCE_BOUNDS, MODES, skeetPosition, strafePosition } from '../../game/modes';
 import { beachBallTexture, dotTexture } from './textures';
 
@@ -16,6 +16,15 @@ const PATHS = { strafe: strafePosition, skeet: skeetPosition };
 const SHRINKS = new Set(['popin', 'survival']);
 
 const noRaycast = () => {};
+
+// Three flat shading tones for the 'pixel' style.
+const TOON_STEPS = (() => {
+  const texture = new DataTexture(new Uint8Array([70, 150, 255]), 3, 1, RedFormat);
+  texture.minFilter = NearestFilter;
+  texture.magFilter = NearestFilter;
+  texture.needsUpdate = true;
+  return texture;
+})();
 
 function TargetMaterial({ style, color, halo }) {
   if (style === 'floatie') {
@@ -51,6 +60,9 @@ function TargetMaterial({ style, color, halo }) {
         sheenRoughness={0.4}
       />
     );
+  }
+  if (style === 'pixel') {
+    return <meshToonMaterial color={color} gradientMap={TOON_STEPS} />;
   }
   if (style === 'neon') {
     // Dark glass core; the glow comes from the tube rings and the rim shell.

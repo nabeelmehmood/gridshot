@@ -157,7 +157,7 @@ export default function Scene() {
         haloColor={look.haloColor}
       />
       <Scoreboard
-        key={settings.theme}
+        key={`sign-${settings.theme}`}
         theme={settings.theme}
         fov={settings.fov}
         running={game.phase === PHASES.RUNNING}

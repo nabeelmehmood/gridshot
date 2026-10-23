@@ -77,7 +77,7 @@
     <rect x="80" y="380" width="128" height="44" rx="22" fill="rgba(255,207,51,0.12)" stroke="#ffcf33" stroke-width="2"/>
     <text x="144" y="409" text-anchor="middle">8 modes</text>
     <rect x="222" y="380" width="136" height="44" rx="22" fill="rgba(255,207,51,0.12)" stroke="#ffcf33" stroke-width="2"/>
-    <text x="290" y="409" text-anchor="middle">8 themes</text>
+    <text x="290" y="409" text-anchor="middle">9 themes</text>
     <rect x="372" y="380" width="178" height="44" rx="22" fill="rgba(255,207,51,0.12)" stroke="#ffcf33" stroke-width="2"/>
     <text x="461" y="409" text-anchor="middle">Leaderboards</text>
   </g>

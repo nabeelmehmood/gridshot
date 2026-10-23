@@ -1,4 +1,4 @@
-import { CanvasTexture, RepeatWrapping, SRGBColorSpace } from 'three';
+import { CanvasTexture, NearestFilter, RepeatWrapping, SRGBColorSpace } from 'three';
 
 // Every texture is drawn on a canvas at runtime: no image downloads. Seeded randomness keeps them
 // identical between loads. Static textures are cached for the app's lifetime (they're small).
@@ -634,3 +634,159 @@ export const strataTexture = repeat =>
       }
     })
   );
+
+// --- Pixel world ---------------------------------------------------------------------------
+// Tiny canvases (a few pixels per tile) with nearest filtering up close, so every texel shows as a
+// crisp square; mipmaps still smooth them out in the distance.
+
+function crisp(texture) {
+  texture.magFilter = NearestFilter;
+  return texture;
+}
+
+function pixelTile(key, repeat, size, draw) {
+  return cached(`pixel-${key}`, repeat, () =>
+    crisp(
+      drawTexture(size[0], size[1], (ctx, w, h) => {
+        const dot = (x, y, color) => {
+          ctx.fillStyle = color;
+          ctx.fillRect(x, y, 1, 1);
+        };
+        draw(ctx, w, h, dot);
+      })
+    )
+  );
+}
+
+// Fills the cells where `inside(x, y)` holds, outlining its edge.
+function pixelShape(w, h, dot, inside, fill, outline) {
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!inside(x, y)) continue;
+      const edge = !inside(x - 1, y) || !inside(x + 1, y) || !inside(x, y - 1) || !inside(x, y + 1);
+      dot(x, y, edge ? outline : fill(x, y));
+    }
+  }
+}
+
+export const pixelGrassTexture = repeat =>
+  pixelTile('grass', repeat, [16, 16], (ctx, w, h, dot) => {
+    const rand = seeded(83);
+    ctx.fillStyle = '#4fb33a';
+    ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < 18; i++) dot(Math.floor(rand() * w), Math.floor(rand() * h), '#47a834');
+    for (let i = 0; i < 8; i++) dot(Math.floor(rand() * w), Math.floor(rand() * h), '#5cbf44');
+  });
+
+// Grass-topped dirt, for the side of ground blocks.
+export const pixelGroundBlockTexture = () =>
+  pixelTile('ground-block', [1, 1], [16, 16], (ctx, w, h, dot) => {
+    const rand = seeded(19);
+    ctx.fillStyle = '#b8742e';
+    ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < 22; i++) dot(Math.floor(rand() * w), 4 + Math.floor(rand() * (h - 4)), rand() < 0.6 ? '#8a5220' : '#d8964a');
+    ctx.fillStyle = '#4fb33a';
+    ctx.fillRect(0, 0, w, 4);
+    ctx.fillStyle = '#72d34e';
+    ctx.fillRect(0, 0, w, 1);
+    for (let x = 0; x < w; x++) if (rand() < 0.5) dot(x, 4, '#3d9a2e');
+    ctx.fillStyle = '#5a3612';
+    ctx.fillRect(0, h - 1, w, 1);
+    ctx.fillRect(w - 1, 4, 1, h - 4);
+  });
+
+export const pixelBrickTexture = () =>
+  pixelTile('brick', [1, 1], [16, 16], (ctx, w, h) => {
+    ctx.fillStyle = '#c8601c';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#e8884a';
+    ctx.fillRect(0, 0, w, 1);
+    ctx.fillStyle = '#5a2a0c';
+    for (const y of [7, 15]) ctx.fillRect(0, y, w, 1);
+    for (const [x, y] of [[7, 0], [15, 0], [3, 8], [11, 8]]) ctx.fillRect(x, y, 1, 7);
+  });
+
+// Gold bonus block with rivets and a star.
+export const pixelBonusTexture = () =>
+  pixelTile('bonus', [1, 1], [16, 16], (ctx, w, h, dot) => {
+    ctx.fillStyle = '#5a3600';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#f8b800';
+    ctx.fillRect(1, 1, w - 2, h - 2);
+    ctx.fillStyle = '#ffdc5a';
+    ctx.fillRect(1, 1, w - 2, 1);
+    ctx.fillRect(1, 1, 1, h - 2);
+    for (const [x, y] of [[2, 2], [13, 2], [2, 13], [13, 13]]) dot(x, y, '#7a4a00');
+    const star = ['...#...', '...#...', '#######', '.#####.', '..###..', '.##.##.', '.#...#.'];
+    star.forEach((row, y) => [...row].forEach((c, x) => c === '#' && dot(x + 4, y + 4, '#fff1e8')));
+  });
+
+export const pixelStoneTexture = repeat =>
+  pixelTile('stone', repeat, [16, 16], (ctx, w, h) => {
+    ctx.fillStyle = '#9aa0a8';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#5d636b';
+    for (const y of [3, 7, 11, 15]) ctx.fillRect(0, y, w, 1);
+    for (const [x, y] of [[5, 0], [13, 0], [1, 4], [9, 4], [5, 8], [13, 8], [1, 12], [9, 12]]) ctx.fillRect(x, y, 1, 3);
+  });
+
+export const pixelLeavesTexture = () =>
+  pixelTile('leaves', [1, 1], [16, 16], (ctx, w, h, dot) => {
+    const rand = seeded(47);
+    ctx.fillStyle = '#3fa535';
+    ctx.fillRect(0, 0, w, h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if ((x + y) % 4 === 0 && rand() < 0.6) dot(x, y, '#2e7d27');
+    for (let i = 0; i < 14; i++) dot(Math.floor(rand() * w), Math.floor(rand() * h), '#5cc94a');
+  });
+
+export const pixelTrunkTexture = () =>
+  pixelTile('trunk', [1, 1], [8, 16], (ctx, w, h) => {
+    ctx.fillStyle = '#8a5a2b';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#6a4220';
+    for (const x of [1, 4, 6]) ctx.fillRect(x, 0, 1, h);
+  });
+
+// Calm navy board for the targets, in 8-pixel checks.
+export const pixelBoardTexture = repeat =>
+  pixelTile('board', repeat, [16, 16], ctx => {
+    ctx.fillStyle = '#1d2b53';
+    ctx.fillRect(0, 0, 16, 16);
+    ctx.fillStyle = '#23345f';
+    ctx.fillRect(0, 0, 8, 8);
+    ctx.fillRect(8, 8, 8, 8);
+  });
+
+export const pixelCloudTexture = () =>
+  pixelTile('cloud', [1, 1], [32, 14], (ctx, w, h, dot) => {
+    const bumps = [[8, 8, 6], [15, 6, 6], [22, 8, 6], [27, 10, 4], [4, 10, 4]];
+    const inside = (x, y) => y < h - 1 && y >= 0 && bumps.some(([cx, cy, r]) => (x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 < r * r);
+    pixelShape(w, h, dot, inside, (x, y) => (y > h - 5 ? '#c8dcff' : '#ffffff'), '#3a66c8');
+  });
+
+// Dome hill with a darker outline and a few spots; also used small as a bush.
+export const pixelHillTexture = (key, fill, shade, outline) =>
+  pixelTile(`hill-${key}`, [1, 1], [32, 16], (ctx, w, h, dot) => {
+    const inside = (x, y) => x >= 0 && x < w && y < h && (x + 0.5 - w / 2) ** 2 / (w / 2) ** 2 + (y + 0.5 - h) ** 2 / h ** 2 < 1;
+    pixelShape(w, h, dot, inside, () => fill, outline);
+    for (const [x, y] of [[11, 7], [12, 7], [11, 8], [19, 10], [20, 10], [20, 11], [15, 12]]) dot(x, y, shade);
+  });
+
+export const pixelCoinTexture = () =>
+  pixelTile('coin', [1, 1], [10, 14], (ctx, w, h, dot) => {
+    const inside = (x, y) => (x + 0.5 - w / 2) ** 2 / (w / 2) ** 2 + (y + 0.5 - h / 2) ** 2 / (h / 2) ** 2 < 1;
+    pixelShape(w, h, dot, inside, (x, y) => (x === 2 ? '#fff1a8' : x === 5 && y > 3 && y < 10 ? '#c07800' : x > 6 ? '#e8a800' : '#ffcc00'), '#6a3c00');
+  });
+
+export const pixelSunTexture = () =>
+  pixelTile('sun', [1, 1], [16, 16], (ctx, w, h, dot) => {
+    const inside = (x, y) => (x + 0.5 - 8) ** 2 + (y + 0.5 - 8) ** 2 < 49;
+    pixelShape(w, h, dot, inside, (x, y) => (x + y < 10 ? '#fff6b0' : '#ffe14a'), '#f8a000');
+  });
+
+// Single white pixel for square particles.
+export const pixelDotTexture = () =>
+  pixelTile('dot', [1, 1], [4, 4], ctx => {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 4, 4);
+  });

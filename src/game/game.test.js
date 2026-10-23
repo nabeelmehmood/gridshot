@@ -244,11 +244,11 @@ describe('streaks', () => {
     return state;
   };
 
-  it('adds +1 per hit for every 10 in a row, capped at +4', () => {
-    expect([1, 9, 10, 19, 20, 39, 40, 200].map(streakBonus)).toEqual([0, 0, 1, 1, 2, 3, 4, 4]);
+  it('adds +1 per hit for every 10 in a row, capped at +5', () => {
+    expect([1, 9, 10, 19, 20, 39, 40, 49, 50, 200].map(streakBonus)).toEqual([0, 0, 1, 1, 2, 3, 4, 4, 5, 5]);
     expect(maxStreakBonus(9)).toBe(0);
     expect(maxStreakBonus(12)).toBe(3);
-    expect(maxStreakBonus(50)).toBe(10 + 20 + 30 + 11 * 4);
+    expect(maxStreakBonus(60)).toBe(10 + 20 + 30 + 40 + 11 * 5);
   });
 
   it('builds a bonus, and a miss resets the streak and flags the break', () => {

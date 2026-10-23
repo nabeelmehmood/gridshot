@@ -5,12 +5,93 @@ import { seeded } from './textures';
 // caution poster, a neon billboard...) and lays the same information out in its own colours.
 const DISPLAY = 'Rajdhani, "Arial Narrow", sans-serif';
 
+// 5×7 bitmap font for the pixel sign. Unknown characters draw as spaces.
+const GLYPHS = {
+  A: '.###.|#...#|#...#|#####|#...#|#...#|#...#',
+  B: '####.|#...#|#...#|####.|#...#|#...#|####.',
+  C: '.###.|#...#|#....|#....|#....|#...#|.###.',
+  D: '####.|#...#|#...#|#...#|#...#|#...#|####.',
+  E: '#####|#....|#....|####.|#....|#....|#####',
+  F: '#####|#....|#....|####.|#....|#....|#....',
+  G: '.###.|#...#|#....|#.###|#...#|#...#|.###.',
+  H: '#...#|#...#|#...#|#####|#...#|#...#|#...#',
+  I: '#####|..#..|..#..|..#..|..#..|..#..|#####',
+  J: '..###|...#.|...#.|...#.|#..#.|#..#.|.##..',
+  K: '#...#|#..#.|#.#..|##...|#.#..|#..#.|#...#',
+  L: '#....|#....|#....|#....|#....|#....|#####',
+  M: '#...#|##.##|#.#.#|#.#.#|#...#|#...#|#...#',
+  N: '#...#|##..#|#.#.#|#..##|#...#|#...#|#...#',
+  O: '.###.|#...#|#...#|#...#|#...#|#...#|.###.',
+  P: '####.|#...#|#...#|####.|#....|#....|#....',
+  Q: '.###.|#...#|#...#|#...#|#.#.#|#..#.|.##.#',
+  R: '####.|#...#|#...#|####.|#.#..|#..#.|#...#',
+  S: '.####|#....|#....|.###.|....#|....#|####.',
+  T: '#####|..#..|..#..|..#..|..#..|..#..|..#..',
+  U: '#...#|#...#|#...#|#...#|#...#|#...#|.###.',
+  V: '#...#|#...#|#...#|#...#|#...#|.#.#.|..#..',
+  W: '#...#|#...#|#...#|#.#.#|#.#.#|##.##|#...#',
+  X: '#...#|#...#|.#.#.|..#..|.#.#.|#...#|#...#',
+  Y: '#...#|#...#|.#.#.|..#..|..#..|..#..|..#..',
+  Z: '#####|....#|...#.|..#..|.#...|#....|#####',
+  0: '.###.|#...#|#..##|#.#.#|##..#|#...#|.###.',
+  1: '..#..|.##..|..#..|..#..|..#..|..#..|.###.',
+  2: '.###.|#...#|....#|...#.|..#..|.#...|#####',
+  3: '#####|...#.|..#..|...#.|....#|#...#|.###.',
+  4: '...#.|..##.|.#.#.|#..#.|#####|...#.|...#.',
+  5: '#####|#....|####.|....#|....#|#...#|.###.',
+  6: '..##.|.#...|#....|####.|#...#|#...#|.###.',
+  7: '#####|....#|...#.|..#..|.#...|.#...|.#...',
+  8: '.###.|#...#|#...#|.###.|#...#|#...#|.###.',
+  9: '.###.|#...#|#...#|.####|....#|...#.|.##..',
+  '×': '.....|#...#|.#.#.|..#..|.#.#.|#...#|.....',
+  '+': '.....|..#..|..#..|#####|..#..|..#..|.....',
+  '-': '.....|.....|.....|#####|.....|.....|.....',
+  '.': '.....|.....|.....|.....|.....|.##..|.##..',
+  '!': '..#..|..#..|..#..|..#..|..#..|.....|..#..',
+  '=': '.....|.....|#####|.....|#####|.....|.....',
+  '·': '.....|.....|.....|..#..|.....|.....|.....'
+};
+
+// Font size → whole canvas pixels per glyph pixel, so edges stay sharp.
+const pixelUnit = size => Math.max(1, Math.round(size / 10));
+
+function pixelTextWidth(value, size, spacing = 0) {
+  const unit = pixelUnit(size);
+  return value.length * (6 * unit + spacing) - unit - spacing;
+}
+
+function pixelText(ctx, value, x, y, { size, color, align, spacing = 0, shadow }) {
+  const unit = pixelUnit(size);
+  const width = pixelTextWidth(value, size, spacing);
+  let left = Math.round(align === 'right' ? x - width : align === 'center' ? x - width / 2 : x);
+  const top = Math.round(y - 7 * unit);
+  for (const char of value.toUpperCase()) {
+    const rows = GLYPHS[char]?.split('|');
+    rows?.forEach((row, gy) =>
+      [...row].forEach((cell, gx) => {
+        if (cell !== '#') return;
+        if (shadow) {
+          ctx.fillStyle = shadow;
+          ctx.fillRect(left + gx * unit + unit, top + gy * unit + unit, unit, unit);
+        }
+        ctx.fillStyle = color;
+        ctx.fillRect(left + gx * unit, top + gy * unit, unit, unit);
+      })
+    );
+    left += 6 * unit + spacing;
+  }
+}
+
 function roundRect(ctx, x, y, width, height, radius) {
   ctx.beginPath();
   ctx.roundRect(x, y, width, height, radius);
 }
 
-function text(ctx, value, x, y, { size, color, align = 'left', spacing = 0, glow = null, engrave = null }) {
+function text(ctx, value, x, y, { size, color, align = 'left', spacing = 0, glow = null, engrave = null, pixel = false, shadow }) {
+  if (pixel) {
+    pixelText(ctx, value, x, y, { size, color, align, spacing, shadow });
+    return;
+  }
   ctx.font = `700 ${size}px ${DISPLAY}`;
   ctx.letterSpacing = `${spacing}px`;
   ctx.textAlign = align;
@@ -27,6 +108,9 @@ function text(ctx, value, x, y, { size, color, align = 'left', spacing = 0, glow
   ctx.shadowColor = 'transparent';
 }
 
+// Faces with `pixel: true` draw every label in the bitmap font, with a hard drop shadow.
+const fontOf = colors => (colors.pixel ? { pixel: true, shadow: colors.shadow } : {});
+
 // The information, laid out inside `box`. Landscape: big number left, badge and pace right, bar
 // along the bottom. Portrait: everything stacked.
 function content(ctx, box, colors, labels, view, layout) {
@@ -36,6 +120,7 @@ function content(ctx, box, colors, labels, view, layout) {
   const portrait = layout === 'portrait';
   const glow = colors.glow ?? null;
   const engrave = colors.engrave ?? null;
+  const font = fontOf(colors);
   const labelSize = Math.round((portrait ? width : height) * (portrait ? 0.095 : 0.16));
   const numberSize = Math.round((portrait ? width : height) * (portrait ? 0.5 : 0.66));
 
@@ -47,14 +132,14 @@ function content(ctx, box, colors, labels, view, layout) {
   if (portrait) {
     let cursor = y + labelSize;
     if (!colors.labelInHeader || lost) {
-      text(ctx, title, x + width / 2, cursor, { size: labelSize, color: titleColor, align: 'center', spacing: 4, glow, engrave });
+      text(ctx, title, x + width / 2, cursor, { ...font, size: labelSize, color: titleColor, align: 'center', spacing: 4, glow, engrave });
     }
     cursor += numberSize * 0.95;
-    text(ctx, value, x + width / 2, cursor, { size: numberSize, color: valueColor, align: 'center', glow, engrave });
+    text(ctx, value, x + width / 2, cursor, { ...font, size: numberSize, color: valueColor, align: 'center', glow, engrave });
     if (lost) return;
     cursor += labelSize * 0.6;
     if (!running) {
-      text(ctx, `${STREAK_STEP} IN A ROW = ×1.1`, x + width / 2, cursor + labelSize, { size: labelSize * 0.8, color: colors.muted, align: 'center', glow });
+      text(ctx, `${STREAK_STEP} IN A ROW = ×1.1`, x + width / 2, cursor + labelSize, { ...font, size: labelSize * 0.8, color: colors.muted, align: 'center', glow });
       return;
     }
     badge(ctx, `×${streakMultiplier(streak).toFixed(1)}`, x + width / 2, cursor, labelSize * 2.8, tier, colors, 'center');
@@ -65,12 +150,12 @@ function content(ctx, box, colors, labels, view, layout) {
   }
 
   if (!colors.labelInHeader || lost) {
-    text(ctx, title, x, y + labelSize, { size: labelSize, color: titleColor, spacing: 5, glow, engrave });
+    text(ctx, title, x, y + labelSize, { ...font, size: labelSize, color: titleColor, spacing: 5, glow, engrave });
   }
-  text(ctx, value, x - numberSize * 0.03, y + height - labelSize * 0.9, { size: numberSize, color: valueColor, glow, engrave });
+  text(ctx, value, x - numberSize * 0.03, y + height - labelSize * 0.9, { ...font, size: numberSize, color: valueColor, glow, engrave });
   if (lost) return;
   if (!running) {
-    text(ctx, `${STREAK_STEP} IN A ROW = ×1.1`, x + width, y + labelSize, { size: labelSize * 0.8, color: colors.muted, align: 'right', glow });
+    text(ctx, `${STREAK_STEP} IN A ROW = ×1.1`, x + width, y + labelSize, { ...font, size: labelSize * 0.8, color: colors.muted, align: 'right', glow });
     text(ctx, `UP TO ×${streakMultiplier(STREAK_STEP * MAX_STREAK_BONUS).toFixed(1)}`, x + width, y + labelSize * 2.1, {
       size: labelSize * 0.8,
       color: colors.muted,
@@ -85,14 +170,16 @@ function content(ctx, box, colors, labels, view, layout) {
 }
 
 function badge(ctx, label, x, y, height, tier, colors, align) {
+  const font = fontOf(colors);
   ctx.font = `700 ${height * 0.78}px ${DISPLAY}`;
   ctx.letterSpacing = '0px';
-  const width = ctx.measureText(label).width + height * 0.6;
+  const width = (font.pixel ? pixelTextWidth(label, height * 0.78) : ctx.measureText(label).width) + height * 0.6;
   const left = align === 'right' ? x - width : align === 'center' ? x - width / 2 : x;
   roundRect(ctx, left, y, width, height, height / 2);
   ctx.fillStyle = tier > 0 ? colors.accent : colors.badgeIdle;
   ctx.fill();
   text(ctx, label, left + width / 2, y + height * 0.8, {
+    ...font,
     size: height * 0.78,
     color: tier > 0 ? colors.accentText : colors.muted,
     align: 'center'
@@ -100,8 +187,9 @@ function badge(ctx, label, x, y, height, tier, colors, align) {
 }
 
 function paceLine(ctx, pace, x, y, size, colors, align) {
+  const font = fontOf(colors);
   const ahead = pace >= 0;
-  text(ctx, `${ahead ? '+' : ''}${pace} VS BEST`, x, y, { size: size * 0.95, color: ahead ? colors.good : colors.bad, align, spacing: 2, glow: colors.glow });
+  text(ctx, `${ahead ? '+' : ''}${pace} VS BEST`, x, y, { ...font, size: size * 0.95, color: ahead ? colors.good : colors.bad, align, spacing: 2, glow: colors.glow });
 }
 
 function bar(ctx, x, y, width, height, streak, tier, colors) {
@@ -321,6 +409,32 @@ function panel(ctx, w, h, colors) {
   ctx.stroke();
 }
 
+// 8-bit high-score screen: navy with a stepped gold border and two pixel coins in the corner.
+function arcade(ctx, w, h) {
+  const u = 16;
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(u, 0, w - 2 * u, h);
+  ctx.fillRect(0, u, w, h - 2 * u);
+  ctx.fillStyle = '#ffcc00';
+  ctx.fillRect(2 * u, u, w - 4 * u, h - 2 * u);
+  ctx.fillRect(u, 2 * u, w - 2 * u, h - 4 * u);
+  ctx.fillStyle = '#1d2b53';
+  ctx.fillRect(3 * u, 2 * u, w - 6 * u, h - 4 * u);
+  ctx.fillRect(2 * u, 3 * u, w - 4 * u, h - 6 * u);
+  ctx.fillStyle = '#23345f';
+  for (let y = 3 * u; y < h - 3 * u; y += 2 * u) ctx.fillRect(3 * u, y, w - 6 * u, u / 4);
+  const coin = ['.##.', '#yy#', '#yw#', '#yy#', '.##.'];
+  for (const [cx, cy] of [[w - 9 * u, h - 8 * u], [w - 6 * u, h - 8 * u]]) {
+    coin.forEach((row, y) =>
+      [...row].forEach((cell, x) => {
+        if (cell === '.') return;
+        ctx.fillStyle = cell === '#' ? '#c07800' : cell === 'w' ? '#fff1a8' : '#ffcc00';
+        ctx.fillRect(cx + x * (u / 2), cy + y * (u / 2), u / 2, u / 2);
+      })
+    );
+  }
+}
+
 const LANDSCAPE = [1024, 320];
 
 // size: canvas pixels. box: content area as fractions of the canvas. labels: the three titles.
@@ -353,6 +467,13 @@ export const FACES = {
     labels: { run: 'STREAK', best: 'BEST STREAK', lost: 'STREAK LOST' },
     colors: { text: '#e0f6ff', glow: '#38bdf8', muted: '#7dd3fc', accent: '#38bdf8', accentText: '#00121f', badgeIdle: 'rgba(125, 211, 252, 0.15)', track: 'rgba(125, 211, 252, 0.2)', good: '#5eead4', bad: '#fb7185' },
     paint: hologram
+  },
+  pixel: {
+    size: [1024, 600],
+    box: [0.09, 0.15, 0.82, 0.72],
+    labels: { run: 'COMBO', best: 'BEST COMBO', lost: 'COMBO LOST' },
+    colors: { text: '#fff1e8', muted: '#ffcc00', accent: '#ff004d', accentText: '#fff1e8', badgeIdle: 'rgba(255, 255, 255, 0.12)', track: 'rgba(255, 255, 255, 0.14)', fill: '#00e436', good: '#00e436', bad: '#ff004d', pixel: true, shadow: '#000000' },
+    paint: arcade
   },
   prison: {
     size: LANDSCAPE,

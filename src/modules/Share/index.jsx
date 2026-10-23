@@ -40,7 +40,7 @@ function feedbackUrl(gameInfo, topic) {
   return `${FEEDBACK_FORM_URL}?${params}`;
 }
 
-const DEFAULT_TEXT = 'Gridshot is a free browser aim trainer for FPS warmups. 8 modes, 8 themes and leaderboards.';
+const DEFAULT_TEXT = 'Gridshot is a free browser aim trainer for FPS warmups. 8 modes, 9 themes and leaderboards.';
 
 const canNativeShare = () => typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 

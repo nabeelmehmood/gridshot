@@ -158,6 +158,25 @@
   box-shadow: 0 0 4px currentColor;
 }
 
+.cursor[data-theme='pixel'] .particle {
+  width: 6px;
+  height: 6px;
+  border-radius: 0;
+  animation-name: burstPixel;
+  animation-timing-function: steps(5);
+}
+
+@keyframes burstPixel {
+  from {
+    transform: translate(var(--x0), var(--y0));
+    opacity: 1;
+  }
+  to {
+    transform: translate(calc(var(--x0) + var(--dx)), calc(var(--y0) + var(--dy)));
+    opacity: 0;
+  }
+}
+
 @keyframes burst {
   from {
     transform: translate(var(--x0), var(--y0)) rotate(var(--spin)) scale(1);

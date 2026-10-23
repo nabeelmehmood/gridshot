@@ -19,6 +19,7 @@ register(
 const { MODE_IDS, MODES } = await import('../src/game/modes.js');
 const { RANK_THRESHOLDS, TIERS } = await import('../src/game/ranks.js');
 const { GAME_DURATION, MAX_STREAK_BONUS, POINTS, STREAK_STEP } = await import('../src/game/scoring.js');
+const { THEME_IDS } = await import('../src/themes.js');
 
 const SITE = 'https://nabeelmehmood.github.io/gridshot/';
 const BASE = '/gridshot/';
@@ -242,7 +243,7 @@ function page(id) {
         </ul>
       </section>
 
-      <footer>Gridshot is a free browser aim trainer with ${MODE_IDS.length} modes, 8 themes and leaderboards. <a href="${BASE}">Play now</a>.</footer>
+      <footer>Gridshot is a free browser aim trainer with ${MODE_IDS.length} modes, ${THEME_IDS.length} themes and leaderboards. <a href="${BASE}">Play now</a>.</footer>
     </main>
   </body>
 </html>

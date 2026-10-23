@@ -52,7 +52,7 @@ const DEFAULT_MODE = 'gridshot';
 const POINTS = { HIT: 10, MISS: -10, EXPIRED: -5 };
 // Every STREAK_STEP hits in a row adds +1 to each hit, up to +MAX_STREAK_BONUS.
 const STREAK_STEP = 10;
-const MAX_STREAK_BONUS = 4;
+const MAX_STREAK_BONUS = 5;
 
 // Hit order isn't reported, so the claimed bonus is capped at what one unbroken streak of `hits` earns.
 function maxStreakBonus(hits) {

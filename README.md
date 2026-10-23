@@ -1,6 +1,6 @@
 # Gridshot
 
-A browser aim trainer for FPS warmups. Every run is 60 seconds; hits are +10, misses -10, and every 10 hits in a row adds +1 per hit (up to ×1.4).
+A browser aim trainer for FPS warmups. Every run is 60 seconds; hits are +10, misses -10, and every 10 hits in a row adds +1 per hit (up to ×1.5).
 
 Play it at https://nabeelmehmood.github.io/gridshot/
 
@@ -22,7 +22,7 @@ best; ending early with Esc doesn't. Each mode has its own leaderboard.
 
 ## Themes
 
-Playground, Daydream, Kawaii, Pool, Deep space, Neon, Cell block and Classic, picked in Settings.
+Playground, Daydream, Kawaii, Pool, Deep space, Neon, Pixel world, Cell block and Classic, picked in Settings.
 Each is defined in `src/themes.js` (target colour and style, backdrop board, particles, UI tint)
 with its scenery in `src/modules/Scene/environments/`. Every texture is drawn on a canvas at
 runtime, so there are no image downloads. Targets always sit on the theme's backdrop board with a

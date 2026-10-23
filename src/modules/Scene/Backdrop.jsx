@@ -2,6 +2,7 @@ import {
   cloudPaperTexture,
   ginghamTexture,
   hexPanelTexture,
+  pixelBoardTexture,
   scanlineTexture,
   steelTexture,
   tileTexture,
@@ -24,7 +25,8 @@ const TEXTURES = {
   tiles: () => tileTexture('board', '#d7eef8', '#a9d0e2', [12, 5]),
   hex: () => hexPanelTexture([7, 3]),
   scanlines: () => scanlineTexture([2, 1]),
-  steel: () => steelTexture([3, 1.25])
+  steel: () => steelTexture([3, 1.25]),
+  pixelBoard: () => pixelBoardTexture([21.2, 8.8])
 };
 
 export default function Backdrop({ texture, color = '#ffffff', frame, opacity = 1, glowFrame = false }) {

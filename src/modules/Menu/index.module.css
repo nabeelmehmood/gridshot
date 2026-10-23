@@ -661,7 +661,7 @@
 /* Rungs rise and fill in with the accent as the multiplier grows. */
 .rungs {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   align-items: end;
   gap: 4px;
   margin: 0;
@@ -681,22 +681,27 @@
 }
 
 .rung[data-tier='1'] {
-  min-height: 46px;
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  min-height: 44px;
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .rung[data-tier='2'] {
-  min-height: 52px;
-  background: color-mix(in srgb, var(--accent) 40%, transparent);
+  min-height: 50px;
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 .rung[data-tier='3'] {
-  min-height: 58px;
-  background: color-mix(in srgb, var(--accent) 82%, transparent);
+  min-height: 56px;
+  background: color-mix(in srgb, var(--accent) 60%, transparent);
 }
 
 .rung[data-tier='4'] {
-  min-height: 64px;
+  min-height: 62px;
+  background: color-mix(in srgb, var(--accent) 85%, transparent);
+}
+
+.rung[data-tier='5'] {
+  min-height: 68px;
   background: var(--accent);
   box-shadow: 0 0 14px -4px var(--accent);
 }
@@ -718,7 +723,9 @@
 .rung[data-tier='3'] .rungMultiplier,
 .rung[data-tier='3'] .rungHits,
 .rung[data-tier='4'] .rungMultiplier,
-.rung[data-tier='4'] .rungHits {
+.rung[data-tier='4'] .rungHits,
+.rung[data-tier='5'] .rungMultiplier,
+.rung[data-tier='5'] .rungHits {
   color: var(--accent-text);
 }
 

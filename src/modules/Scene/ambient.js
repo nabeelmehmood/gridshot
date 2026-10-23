@@ -1,6 +1,6 @@
 import { Color } from 'three';
 import { ParticleBuffer } from './particles';
-import { dotTexture, featherTexture, heartTexture } from './textures';
+import { dotTexture, featherTexture, heartTexture, pixelDotTexture } from './textures';
 
 // motion: 'drift' wanders sideways, 'rise' floats up, 'fall' sinks down. Positions wrap inside bounds.
 const PRESETS = {
@@ -29,6 +29,10 @@ const PRESETS = {
     count: 160, map: dotTexture, size: 0.09, colors: ['#ff2bd6', '#22e6ff', '#b46bff'], alpha: 0.8,
     bounds: [[-10, 10], [-1, 9], [-9, 1]], motion: 'rise', velocity: [0, 0.6, 0], wobble: 0.05,
     additive: true, twinkle: true
+  },
+  pixels: {
+    count: 70, map: pixelDotTexture, size: 0.14, colors: ['#fff1a8', '#ffffff', '#ffcc00'], alpha: 0.85,
+    bounds: [[-24, 24], [-1, 12], [-28, -2]], motion: 'rise', velocity: [0, 0.4, 0], wobble: 0.1
   },
   dust: {
     count: 220, map: dotTexture, size: 0.06, colors: ['#d9cfb8'], alpha: 0.45,

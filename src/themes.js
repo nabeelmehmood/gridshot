@@ -88,6 +88,20 @@ export const THEMES = {
     halo: true,
     ui: { accent: '#ff2bd6', accentText: '#21001a', panel: 'rgba(14, 6, 26, 0.9)' }
   },
+  pixel: {
+    id: 'pixel',
+    swatch: ['#5a84f2', '#ffcc00', '#4fb33a'],
+    name: 'Pixel world',
+    description: 'An 8-bit overworld: block stairs, floating bricks, spinning coins and a castle on the hills.',
+    // Toon-shaded in three flat tones, like a sprite.
+    targetStyle: 'pixel',
+    targetColor: '#ffcc00',
+    outline: '#3b2300',
+    missColor: '#fff1e8',
+    backdrop: { texture: 'pixelBoard', frame: '#c8601c' },
+    ambient: 'pixels',
+    ui: { accent: '#ffcc00', accentText: '#1d1300', panel: 'rgba(29, 43, 83, 0.92)' }
+  },
   prison: {
     id: 'prison',
     swatch: ['#7a8088', '#ffc21a', '#2a2e33'],

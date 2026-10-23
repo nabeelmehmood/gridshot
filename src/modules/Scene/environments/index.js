@@ -2,6 +2,7 @@ import Classic from './Classic';
 import Daydream from './Daydream';
 import Kawaii from './Kawaii';
 import Neon from './Neon';
+import Pixel from './Pixel';
 import Playground from './Playground';
 import Pool from './Pool';
 import Prison from './Prison';
@@ -15,6 +16,7 @@ export const ENVIRONMENTS = {
   pool: Pool,
   space: Space,
   neon: Neon,
+  pixel: Pixel,
   prison: Prison,
   classic: Classic
 };

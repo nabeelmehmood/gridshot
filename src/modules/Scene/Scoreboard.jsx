@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { AdditiveBlending, CanvasTexture, DoubleSide, SRGBColorSpace } from 'three';
 import { streakBonus } from '../../game/scoring';
 import { FACES, paintFace } from './scoreboardFaces';
+import { pixelBrickTexture } from './textures';
 
 // The streak, as a prop that belongs to each theme: a wooden sign in the park, a caution poster on
 // the pool wall, a billboard over the neon city... Its face (scoreboardFaces.js) is a canvas,
@@ -42,6 +43,8 @@ const PLACEMENTS = {
   kawaii: { prop: 'candy', position: [-3.9, -0.05, -2.6], yaw: 0.12, tilt: -0.1, width: 4 },
   // A cloud drifting over the board's top right: bottom ~20° up (above the board), top ~26°.
   daydream: { prop: 'floating', position: [9, 12.6, -18], yaw: -0.3, tilt: 0, width: 11 },
+  // Same spot as the playground's signpost, up on two brick pillars.
+  pixel: { prop: 'blocks', position: [13.67, 1.3, -8.2], yaw: -0.803, tilt: 0, width: 4 },
   classic: FLOOR
 };
 
@@ -174,6 +177,19 @@ function Supports({ prop, width, height, frame, drop }) {
         <meshStandardMaterial color={i % 2 ? '#ffffff' : '#ff8fc7'} roughness={0.4} />
       </mesh>
     ));
+  }
+  if (prop === 'blocks') {
+    // Brick pillars under both ends, whole blocks from the grass up.
+    const count = Math.max(1, Math.round(drop / 0.7));
+    const size = drop / count;
+    return [-1, 1].flatMap(side =>
+      Array.from({ length: count }, (_, i) => (
+        <mesh key={`${side}-${i}`} position={[side * (width / 2 - size / 2), -drop + size * (i + 0.5), -size / 2 - 0.02]} raycast={noRaycast}>
+          <boxGeometry args={[size, size, size]} />
+          <meshLambertMaterial map={pixelBrickTexture()} />
+        </mesh>
+      ))
+    );
   }
   return null;
 }
