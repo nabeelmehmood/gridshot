@@ -395,21 +395,31 @@ export const windowsTexture = (key, colors, repeat) =>
   );
 
 // Synthwave sun: warm gradient with horizontal gaps towards the bottom.
+// Striped synthwave sun with a soft pink halo; the disc fills the middle 64% of the texture.
 export const synthSunTexture = () =>
   cached('synth-sun', [1, 1], () =>
-    drawTexture(256, 256, (ctx, w) => {
-      const g = ctx.createLinearGradient(0, 0, 0, w);
+    drawTexture(512, 512, (ctx, w) => {
+      const c = w / 2;
+      const r = w * 0.32;
+      const g = ctx.createLinearGradient(0, c - r, 0, c + r);
       g.addColorStop(0, '#ffe46b');
-      g.addColorStop(0.5, '#ff7a59');
+      g.addColorStop(0.45, '#ff9a3c');
       g.addColorStop(1, '#ff2bd6');
       ctx.fillStyle = g;
       ctx.beginPath();
-      ctx.arc(w / 2, w / 2, w / 2 - 2, 0, Math.PI * 2);
+      ctx.arc(c, c, r, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalCompositeOperation = 'destination-out';
-      for (let i = 0, y = w * 0.55; y < w; i++, y += 14 + i * 2) {
-        ctx.fillRect(0, y, w, 3 + i * 1.5);
+      for (let i = 0, y = c - r * 0.25; y < c + r; i++, y += 16 + i * 3) {
+        ctx.fillRect(0, y, w, 3 + i * 2.2);
       }
+      ctx.globalCompositeOperation = 'destination-over';
+      const halo = ctx.createRadialGradient(c, c, r * 0.9, c, c, c);
+      halo.addColorStop(0, 'rgba(255, 90, 160, 0.55)');
+      halo.addColorStop(0.4, 'rgba(255, 43, 214, 0.18)');
+      halo.addColorStop(1, 'rgba(255, 43, 214, 0)');
+      ctx.fillStyle = halo;
+      ctx.fillRect(0, 0, w, w);
     })
   );
 

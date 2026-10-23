@@ -181,3 +181,137 @@
     animation: none;
   }
 }
+
+/* Lock-on brackets: positioned and sized every frame from JS (on the hovered control, or shrunk
+   onto the trailing ring). They take over from the ring while locked. */
+.lock {
+  position: absolute;
+  top: 0;
+  left: 0;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  will-change: transform, width, height;
+}
+
+.lockFrame {
+  position: absolute;
+  inset: 0;
+}
+
+.cursor[data-locked='true'] .lock {
+  opacity: 1;
+}
+
+.cursor[data-locked='true'] .ring {
+  opacity: 0;
+}
+
+.corner {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 0 solid var(--accent);
+  filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.75));
+}
+
+.topLeft {
+  top: 0;
+  left: 0;
+  border-width: 2px 0 0 2px;
+  border-top-left-radius: 3px;
+}
+
+.topRight {
+  top: 0;
+  right: 0;
+  border-width: 2px 2px 0 0;
+  border-top-right-radius: 3px;
+}
+
+.bottomLeft {
+  bottom: 0;
+  left: 0;
+  border-width: 0 0 2px 2px;
+  border-bottom-left-radius: 3px;
+}
+
+.bottomRight {
+  right: 0;
+  bottom: 0;
+  border-width: 0 2px 2px 0;
+  border-bottom-right-radius: 3px;
+}
+
+/* Hitmarker on click: the classic four-stroke X, popping in slightly larger and fading. */
+.hitmarker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  animation: hitmarker 0.32s ease-out forwards;
+}
+
+.hitmarker svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes hitmarker {
+  from {
+    transform: translate(var(--x0), var(--y0)) scale(1.35);
+    opacity: 1;
+  }
+  60% {
+    opacity: 1;
+  }
+  to {
+    transform: translate(var(--x0), var(--y0)) scale(1);
+    opacity: 0;
+  }
+}
+
+/* Recoil kick: the cursor jolts up a few pixels on each click. Two identical animations so
+   alternating names restart it. Uses `translate`, separate from the transforms set elsewhere. */
+.cursor[data-kick='a'] .dot,
+.cursor[data-kick='a'] .ring,
+.cursor[data-kick='a'] .lockFrame {
+  animation: kickA 0.16s ease-out;
+}
+
+.cursor[data-kick='b'] .dot,
+.cursor[data-kick='b'] .ring,
+.cursor[data-kick='b'] .lockFrame {
+  animation: kickB 0.16s ease-out;
+}
+
+@keyframes kickA {
+  35% {
+    translate: 0 -5px;
+  }
+}
+
+@keyframes kickB {
+  35% {
+    translate: 0 -5px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hitmarker {
+    animation-name: fade;
+  }
+}
+
+@keyframes fade {
+  from {
+    transform: translate(var(--x0), var(--y0));
+    opacity: 1;
+  }
+  to {
+    transform: translate(var(--x0), var(--y0));
+    opacity: 0;
+  }
+}

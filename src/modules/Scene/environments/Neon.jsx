@@ -11,6 +11,12 @@ const WINDOW_COLORS = [
   ['amber', ['#ffd166', '#ffe9b0']]
 ];
 const TRIM = ['#ff2bd6', '#22e6ff', '#b46bff'];
+// Synthwave sun up in the clear band between the board's top (~19°) and the score bar, left of
+// the billboard. The texture's disc is 64% of the plane, so it spans about 16°–32° up and 5°–21° left.
+const SUN = { position: [-45, 90, -190], size: 84 };
+const SUN_AZIMUTH = [-24, -2];
+// Buildings in front of the sun stop below its middle, so the skyline cuts across its lower half only.
+const SUN_CUT = Math.tan((22 * Math.PI) / 180);
 
 const BUILDINGS = (() => {
   const rand = seeded(29);
@@ -20,12 +26,18 @@ const BUILDINGS = (() => {
     const z = -32 - rand() * 80;
     // Leave the near middle open so the skyline frames the board instead of crowding it.
     if (Math.abs(x) < 16 && z > -45) continue;
+    const width = 6 + rand() * 9;
+    const depth = 6 + rand() * 7;
+    let height = 10 + rand() * 38;
+    const distance = 5 - z;
+    const azimuth = (Math.atan2(x, distance) * 180) / Math.PI;
+    if (azimuth > SUN_AZIMUTH[0] && azimuth < SUN_AZIMUTH[1]) height = Math.min(height, 5 + distance * SUN_CUT);
     list.push({
       x,
       z,
-      width: 6 + rand() * 9,
-      depth: 6 + rand() * 7,
-      height: 10 + rand() * 38,
+      width,
+      depth,
+      height,
       windows: Math.floor(rand() * WINDOW_COLORS.length),
       trim: rand() < 0.45 ? TRIM[Math.floor(rand() * TRIM.length)] : null
     });
@@ -63,7 +75,10 @@ function Skyline() {
 function NeonSign({ text, color, position, rotation, width = 6, flicker = false }) {
   const material = useRef(null);
   useFrame(({ clock }) => {
-    if (!flicker) return;
+    if (!flicker) {
+      material.current.opacity = 1;
+      return;
+    }
     const t = clock.elapsedTime;
     material.current.opacity = Math.sin(t * 23) > 0.92 || (t % 5 > 4.6 && Math.sin(t * 40) > 0) ? 0.25 : 1;
   });
@@ -89,10 +104,10 @@ function NeonSign({ text, color, position, rotation, width = 6, flicker = false 
   );
 }
 
-function Antenna({ position }) {
+function Antenna({ position, blink }) {
   const light = useRef(null);
   useFrame(({ clock }) => {
-    light.current.visible = Math.floor(clock.elapsedTime * 1.2 + position[0]) % 2 === 0;
+    light.current.visible = !blink || Math.floor(clock.elapsedTime * 1.2 + position[0]) % 2 === 0;
   });
   return (
     <group position={position}>
@@ -117,14 +132,16 @@ function RooftopUnit({ position, size }) {
   );
 }
 
-export default function Neon() {
+// Signs flicker and antennas blink in the menu only; during a run they hold steady so nothing
+// in the corner of the eye competes with the targets.
+export default function Neon({ running = false }) {
   return (
     <>
       <color attach="background" args={['#07040f']} />
       <fog attach="fog" args={['#12081f', 30, 130]} />
       <SkyDome texture={gradientTexture('neon', SKY)} />
-      <mesh position={[-60, 40, -165]} raycast={noRaycast}>
-        <circleGeometry args={[22, 48]} />
+      <mesh position={SUN.position} raycast={noRaycast}>
+        <planeGeometry args={[SUN.size, SUN.size]} />
         <meshBasicMaterial map={synthSunTexture()} transparent fog={false} toneMapped={false} depthWrite={false} />
       </mesh>
 
@@ -149,13 +166,13 @@ export default function Neon() {
 
       <Skyline />
       <NeonSign text="NEON" color="#ff2bd6" position={[-15, 6.5, -15]} rotation={[0, 0.45, 0]} width={7} />
-      <NeonSign text="OPEN 24H" color="#22e6ff" position={[15.5, 4, -14]} rotation={[0, -0.45, 0]} width={7} flicker />
+      <NeonSign text="OPEN 24H" color="#22e6ff" position={[15.5, 4, -14]} rotation={[0, -0.45, 0]} width={7} flicker={!running} />
       <NeonSign text="ラーメン" color="#ffd166" position={[-16.5, 1.5, -12]} rotation={[0, 0.5, 0]} width={5} />
 
       <RooftopUnit position={[-13, 0, -6]} size={[3, 2, 2.5]} />
       <RooftopUnit position={[14, 0, -5]} size={[2.5, 1.6, 3]} />
-      <Antenna position={[-12, 1, -6]} />
-      <Antenna position={[13.5, 0.6, -5]} />
+      <Antenna position={[-12, 1, -6]} blink={!running} />
+      <Antenna position={[13.5, 0.6, -5]} blink={!running} />
     </>
   );
 }

@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Raycaster, Vector2, Vector3 } from 'three';
 import { NEAR_RADII } from '../../game/missMap';
 import { MODES } from '../../game/modes';
-import { PHASES } from '../../game/state';
+import { paceVsBest, PHASES } from '../../game/state';
 import { hideBootLoader } from '../../bootLoader';
 import { playShot } from '../../sound';
 import { targetLook, THEMES } from '../../themes';
@@ -12,6 +12,7 @@ import Backdrop from './Backdrop';
 import { Ambient, Effects } from './Effects';
 import { ENVIRONMENTS } from './environments';
 import LookControls from './LookControls';
+import Scoreboard from './Scoreboard';
 import Targets from './Targets';
 
 const SCREEN_CENTER = new Vector2(0, 0);
@@ -128,11 +129,15 @@ export default function Scene() {
   // Practice runs scale target size and how fast everything moves.
   const size = game.practice?.size ?? 1;
   const speed = game.practice?.speed ?? 1;
+  const bestStreak = Math.max(
+    game.bestRuns[game.mode]?.bestStreak ?? 0,
+    ...(game.history[game.mode]?.runs ?? []).map(run => run.bestStreak ?? 0)
+  );
 
   return (
     <Canvas shadows camera={{ position: [0, 4, 5], fov: settings.fov }} style={{ position: 'fixed', inset: 0 }}>
       <group ref={environmentRef}>
-        <Environment key={settings.theme} />
+        <Environment key={settings.theme} running={game.phase === PHASES.RUNNING} />
         {theme.backdrop && <Backdrop {...theme.backdrop} />}
       </group>
       <Targets
@@ -150,6 +155,17 @@ export default function Scene() {
         speed={speed}
         halo={settings.effects && Boolean(theme.halo)}
         haloColor={look.haloColor}
+      />
+      <Scoreboard
+        key={settings.theme}
+        theme={settings.theme}
+        fov={settings.fov}
+        running={game.phase === PHASES.RUNNING}
+        streak={game.streak}
+        streakBreaks={game.streakBreaks}
+        lostStreak={game.lostStreak}
+        pace={paceVsBest(game)}
+        best={bestStreak}
       />
       {settings.effects && theme.ambient && <Ambient key={theme.ambient} preset={theme.ambient} />}
       <Effects ref={effectsRef} />

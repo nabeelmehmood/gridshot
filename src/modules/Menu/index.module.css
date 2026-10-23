@@ -943,18 +943,29 @@
 
 .footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px 12px;
   padding-top: 16px;
   border-top: 1px solid var(--panel-border);
   font-size: 14px;
   color: var(--muted);
 }
 
+/* Wraps onto a second line rather than clipping when the rank badge makes it long. */
 .topScorer {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  min-width: 0;
+}
+
+.yourBest {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   white-space: nowrap;
 }
 
@@ -1114,4 +1125,14 @@
 
 .segment:has(input:focus-visible) {
   outline: 2px solid var(--accent);
+}
+
+.inlineLink {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }

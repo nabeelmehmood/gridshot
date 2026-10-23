@@ -35,14 +35,18 @@ function Cell({ side, from, to }) {
   );
 }
 
-// Caged ceiling lamp; `flicker` makes it cut out in short random bursts.
+// Caged ceiling lamp; `flicker` makes it cut out in short random bursts (menu only, not during a run).
 function Lamp({ position, flicker = false }) {
   const light = useRef(null);
   const bulb = useRef(null);
   const state = useRef({ off: 0 });
 
   useFrame((_, delta) => {
-    if (!flicker) return;
+    if (!flicker) {
+      light.current.intensity = 22;
+      bulb.current.emissiveIntensity = 2.5;
+      return;
+    }
     const s = state.current;
     if (s.off > 0) s.off -= delta;
     else if (Math.random() < delta * 0.8) s.off = 0.05 + Math.random() * 0.25;
@@ -76,7 +80,7 @@ function Lamp({ position, flicker = false }) {
   );
 }
 
-export default function Prison() {
+export default function Prison({ running = false }) {
   return (
     <>
       <color attach="background" args={['#0b0d10']} />
@@ -118,7 +122,7 @@ export default function Prison() {
         </mesh>
       ))}
 
-      <Lamp position={[0, 8.5, -6]} flicker />
+      <Lamp position={[0, 8.5, -6]} flicker={!running} />
       <Lamp position={[0, 8.5, -1.5]} />
     </>
   );

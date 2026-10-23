@@ -13,6 +13,7 @@ import { avgHitMs, bestRunOf, createInitialState, gameReducer, HISTORY_SIZE, pac
 import { USERNAME_PATTERN } from './username';
 import { RANK_THRESHOLDS, rankFor } from './ranks';
 import { summarizeMisses } from './missMap';
+import { placementOn } from './placement';
 import { cmPer360, degreesPerCount, isGameSens } from './sensitivity';
 
 const rolls = value => Array.from({ length: ROLL_COUNT }, () => value);
@@ -412,5 +413,30 @@ describe('saving runs', () => {
 
     state = play(state, start(3));
     expect(state.runSaved).toBeNull();
+  });
+});
+
+describe('leaderboard placement', () => {
+  const board = [
+    { username: 'Ace', score: 2000 },
+    { username: 'Nabeel', score: 1500 },
+    { username: 'Bo', score: 900 }
+  ];
+
+  it('places a score among the other players', () => {
+    expect(placementOn(board, 1800, 'someone')).toBe(2);
+    expect(placementOn(board, 100, 'someone')).toBe(4);
+    expect(placementOn([], 10)).toBe(1);
+  });
+
+  it('ignores your own entry, and returns null when it is already as high', () => {
+    expect(placementOn(board, 1800, 'nabeel')).toBe(2);
+    expect(placementOn(board, 1200, 'NABEEL')).toBeNull();
+  });
+
+  it('returns null outside the top 50', () => {
+    const full = Array.from({ length: 50 }, (_, i) => ({ username: `p${i}`, score: 1000 - i }));
+    expect(placementOn(full, 1, 'me')).toBeNull();
+    expect(placementOn(full, 990, 'me')).toBe(11);
   });
 });

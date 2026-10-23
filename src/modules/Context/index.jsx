@@ -33,7 +33,9 @@ export const DEFAULT_SETTINGS = {
   crosshair: { style: 'cross', color: '#ffffff', size: 22, thickness: 2, gap: 4, outline: true },
   // 'theme' uses the theme's own target look; any other id is a high-contrast colour (see TARGET_COLORS).
   targetColor: 'theme',
-  practice: DEFAULT_PRACTICE
+  practice: DEFAULT_PRACTICE,
+  // Once a name has been saved, later runs go on the leaderboard by themselves (the server keeps the best).
+  autoSave: true
 };
 
 export const SETTING_LIMITS = {
@@ -123,7 +125,8 @@ const loadSettings = () => ({
   customCursor: readStored('customCursor', value => typeof value === 'boolean', DEFAULT_SETTINGS.customCursor),
   crosshair: readStored('crosshair', isCrosshair, DEFAULT_SETTINGS.crosshair),
   targetColor: readStored('targetColor', value => TARGET_COLORS.some(color => color.id === value), DEFAULT_SETTINGS.targetColor),
-  practice: readStored('practice', isPracticeSettings, DEFAULT_SETTINGS.practice)
+  practice: readStored('practice', isPracticeSettings, DEFAULT_SETTINGS.practice),
+  autoSave: readStored('autoSave', value => typeof value === 'boolean', DEFAULT_SETTINGS.autoSave)
 });
 
 // By default the browser applies the OS pointer speed and acceleration, so 1× feels like the desktop.
@@ -204,6 +207,7 @@ export function GameContextProvider({ children }) {
     writeStored('customCursor', settings.customCursor);
     writeStored('targetColor', settings.targetColor);
     writeStored('practice', settings.practice);
+    writeStored('autoSave', settings.autoSave);
   }, [settings]);
 
   useEffect(() => {

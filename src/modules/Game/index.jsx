@@ -55,7 +55,7 @@ export default function Game() {
       )}
       {/* Menu only: in game the pointer is captured and the crosshair takes over. */}
       {hasFinePointer && settings.customCursor && view === 'menu' && game.phase !== PHASES.RUNNING && (
-        <Cursor theme={settings.theme} colors={THEMES[settings.theme].swatch} />
+        <Cursor theme={settings.theme} colors={THEMES[settings.theme].swatch} reduceMotion={settings.reduceMotion} />
       )}
     </>
   );

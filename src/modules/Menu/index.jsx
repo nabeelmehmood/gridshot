@@ -211,6 +211,9 @@ function MainCard({ onOpenLeaderboard, guide, dimmed, onStarted }) {
   const ranked = finished && game.completed && !game.practice && runScore > 0;
   const canSave = ranked && game.runId && !game.runSaved;
   const topScorer = leaderboardFor(game.mode).users[0];
+  // The top entry is the player's own when the name matches the one they save under.
+  const ownName = readStored('username', value => typeof value === 'string', '').toLowerCase();
+  const youAreTop = Boolean(topScorer && ownName && topScorer.username.toLowerCase() === ownName);
   const mode = MODES[game.mode];
   const startStep = guide?.step === 'start';
 
@@ -264,7 +267,7 @@ function MainCard({ onOpenLeaderboard, guide, dimmed, onStarted }) {
         {mode.description}
       </p>
 
-      {finished && <Results game={game} />}
+      {finished && <Results game={game} canSave={canSave} />}
       {finished && !game.completed && (
         <p className={styles.info}>Run ended early. Only finished runs count toward your best.</p>
       )}
@@ -275,8 +278,6 @@ function MainCard({ onOpenLeaderboard, guide, dimmed, onStarted }) {
             : 'The leaderboard server couldn’t be reached when this run started, so it can’t be submitted.'}
         </p>
       )}
-      {canSave && <SaveScore />}
-      {game.runSaved && finished && <p className={styles.success}>{game.runSaved}</p>}
 
       {lockError && (
         <p role="alert" className={styles.warning}>
@@ -297,16 +298,16 @@ function MainCard({ onOpenLeaderboard, guide, dimmed, onStarted }) {
 
       <footer className={styles.footer}>
         <span className={styles.topScorer}>
-          {topScorer && (
-            <>
+          {topScorer && !youAreTop && (
+            <span>
               Top <strong>{cleanName(topScorer.username)}</strong> {topScorer.score}
-            </>
+            </span>
           )}
-          {topScorer && bestRun && ' · '}
           {bestRun && (
-            <>
-              You <strong>{bestRun.score}</strong> <RankBadge rank={rankFor(game.mode, bestRun.score)} />
-            </>
+            <span className={styles.yourBest}>
+              {youAreTop ? "You're #1 ·" : 'You'} <strong>{bestRun.score}</strong>{' '}
+              <RankBadge rank={rankFor(game.mode, bestRun.score)} />
+            </span>
           )}
         </span>
         <span className={styles.footerLinks}>
@@ -522,11 +523,11 @@ function useCountUp(target, still, duration = 900) {
   return shown;
 }
 
-function Results({ game }) {
+function Results({ game, canSave }) {
   const { mode, hits, clicks, expired, bonus, bestStreak, elapsed, newBest, completed, practice } = game;
   const { expiredLabel, untimed, name } = MODES[mode];
   const score = calculateScore(hits, clicks, expired, bonus);
-  const { settings } = useGame();
+  const { settings, setSettings } = useGame();
   const shown = useCountUp(score, settings.reduceMotion);
   const hitMs = avgHitMs(game);
   return (
@@ -541,6 +542,26 @@ function Results({ game }) {
         {/* Practice changes the difficulty, so it isn't ranked. */}
         {!practice && completed && <RankBadge rank={rankFor(mode, score)} showNext size="large" />}
       </div>
+      {/* Right under the score: saving was easy to miss at the bottom of the results. */}
+      {canSave && <SaveScore />}
+      {game.runSaved && (
+        <p className={styles.success}>
+          {game.runSaved}
+          {settings.autoSave && (
+            <>
+              {' '}
+              Saving your runs automatically ·{' '}
+              <button
+                type="button"
+                className={styles.inlineLink}
+                onClick={() => setSettings(current => ({ ...current, autoSave: false }))}
+              >
+                Turn off
+              </button>
+            </>
+          )}
+        </p>
+      )}
       <dl className={styles.statGrid}>
         <Stat label="Hits" value={hits} />
         <Stat label="Misses" value={clicks - hits} />
